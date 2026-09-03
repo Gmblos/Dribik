@@ -1,0 +1,55 @@
+{
+  "tool": "manual-inventory",
+  "hosts": [
+    {
+      "fqdn": "www.example-program.test",
+      "domain": "example-program.test",
+      "alive": true,
+      "ips": ["192.0.2.10"],
+      "wildcard_risk": false
+    },
+    {
+      "fqdn": "api.example-program.test",
+      "domain": "example-program.test",
+      "alive": true,
+      "ips": ["192.0.2.11"]
+    },
+    {
+      "fqdn": "payments.example-program.test",
+      "domain": "example-program.test",
+      "alive": true,
+      "ips": ["192.0.2.12"]
+    },
+    {
+      "fqdn": "orphan.example-program.test",
+      "domain": "example-program.test"
+    }
+  ],
+  "endpoints": [
+    {
+      "method": "GET",
+      "url": "https://www.example-program.test/login",
+      "host": "www.example-program.test",
+      "status": 200,
+      "params": [{ "name": "next", "in": "query" }]
+    },
+    {
+      "method": "GET",
+      "url": "https://api.example-program.test/v1/users",
+      "host": "api.example-program.test",
+      "status": 200,
+      "params": [{ "name": "limit", "in": "query" }]
+    },
+    {
+      "method": "POST",
+      "url": "https://payments.example-program.test/charge",
+      "host": "payments.example-program.test"
+    }
+  ],
+  "js_routes": [
+    {
+      "source_url": "https://www.example-program.test/app.js",
+      "path": "/api/internal/health"
+    }
+  ]
+}

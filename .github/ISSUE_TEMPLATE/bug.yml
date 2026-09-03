@@ -1,0 +1,24 @@
+name: Bug report
+description: Something in inventory, scope, scoring, or reporting is wrong
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach exploit payloads or third-party target dumps with secrets.
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: 0.0.1-beta

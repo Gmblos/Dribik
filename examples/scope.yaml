@@ -1,0 +1,9 @@
+program: Example Corp BB
+allow:
+  - kind: domain_suffix
+    value: example-program.test
+  - kind: url_prefix
+    value: https://api.example-program.test/
+deny:
+  - kind: host_exact
+    value: payments.example-program.test

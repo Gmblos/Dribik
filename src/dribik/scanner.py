@@ -22,6 +22,7 @@ __all__ = [
     "set_rate_limit",
     "set_proxy",
     "set_audit_callback",
+    "http_request",
     "http_get",
     "http_post",
     "crawl",
@@ -281,6 +282,59 @@ def http_post(
     result = ScanResult(url=url, error=last_error, method="POST", request_body=request_body_str)
     _emit_audit(AuditEntry(method="POST", url=url, request_body=request_body_str[:200], error=last_error))
     return result
+
+
+def http_request(
+    method: str,
+    url: str,
+    data: bytes | None = None,
+    *,
+    headers: dict[str, str] | None = None,
+    timeout: int = _DEFAULT_TIMEOUT,
+    follow_redirects: bool = False,
+    max_retries: int = 2,
+) -> ScanResult:
+    """Send an arbitrary HTTP method through the standard rate-limit and audit path."""
+    normalized_method = method.upper()
+    if not normalized_method.isalpha():
+        return ScanResult(url=url, error="HTTP method must contain letters only", method=normalized_method)
+    request_headers = {"User-Agent": _DEFAULT_UA}
+    if headers:
+        request_headers.update(headers)
+    request_body = (data or b"").decode("utf-8", errors="replace")
+    last_error: str | None = None
+    for attempt in range(max_retries + 1):
+        _limiter.wait()
+        start = time.monotonic()
+        try:
+            req = urllib.request.Request(url, data=data, headers=request_headers, method=normalized_method)
+            status, hdrs, raw, final_url = _do_request(req, timeout, follow_redirects=follow_redirects)
+            result = ScanResult(
+                url=url, status=status, headers=hdrs, body=raw.decode("utf-8", errors="replace"),
+                body_hash=hashlib.sha256(raw).hexdigest(),
+                redirect_chain=[final_url] if final_url != url else [],
+                response_time_ms=round((time.monotonic() - start) * 1000, 2), method=normalized_method,
+                request_body=request_body,
+            )
+            _emit_audit(AuditEntry(method=normalized_method, url=url, request_body=request_body[:200],
+                                   status=status, response_time_ms=result.response_time_ms))
+            return result
+        except urllib.error.HTTPError as exc:
+            result = ScanResult(
+                url=url, status=exc.code, headers={key.lower(): value for key, value in exc.headers.items()},
+                body=exc.read(_BODY_READ_LIMIT).decode("utf-8", errors="replace"),
+                response_time_ms=round((time.monotonic() - start) * 1000, 2), method=normalized_method,
+                request_body=request_body,
+            )
+            _emit_audit(AuditEntry(method=normalized_method, url=url, request_body=request_body[:200],
+                                   status=exc.code, response_time_ms=result.response_time_ms))
+            return result
+        except Exception as exc:
+            last_error = str(exc)
+            if attempt < max_retries:
+                time.sleep(0.5 * (2 ** attempt))
+    _emit_audit(AuditEntry(method=normalized_method, url=url, request_body=request_body[:200], error=last_error))
+    return ScanResult(url=url, error=last_error, method=normalized_method, request_body=request_body)
 
 
 def _emit_audit(entry: AuditEntry) -> None:

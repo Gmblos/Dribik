@@ -13,7 +13,7 @@ Dribik is a Python CLI toolkit for structured, consent-tracked web penetration t
 | **Asset graph** | Merges hosts, endpoints, params, JS routes from multiple tools into a deduplicated graph |
 | **Scope / ROE** | Allow/deny rules (domain suffix, host exact, URL prefix) — checked before every active probe |
 | **Consent log** | Per-target, per-capability consent records. All scan commands refuse to run without a valid entry |
-| **Active scanners** | XSS, SQLi (error + time-based), SSRF, LFI, open redirect, security headers, JWT audit |
+| **Active scanners** | XSS, SQLi (error + time-based), SSRF, LFI, open redirect, content discovery, security headers, JWT audit |
 | **Crawler** | BFS crawler respecting scope rules |
 | **Subdomain enum** | DNS brute-force + subdomain takeover detection |
 | **Recon** | Passive crt.sh discovery, plus authorized robots.txt and sitemap analysis |
@@ -63,6 +63,7 @@ dribik scan xss     ./my-engagement --url "https://api.acme.com/search?q=x" --sa
 dribik scan sqli    ./my-engagement --url "https://api.acme.com/items?id=1" --save
 dribik scan ssrf    ./my-engagement --url "https://api.acme.com/fetch?url=x" --save
 dribik scan lfi     ./my-engagement --url "https://api.acme.com/file?path=x" --save
+dribik scan content ./my-engagement --url https://api.acme.com/ --import-graph
 dribik scan jwt     ./my-engagement --token "eyJ..." --save
 dribik scan crawl   ./my-engagement --url https://api.acme.com/ --import-graph
 dribik report sarif ./my-engagement --out ./reports/dribik.sarif
@@ -111,6 +112,7 @@ dribik collection write ./my-engagement --out ./acme.postman_collection.json
 | Command | Purpose |
 |---|---|
 | `dribik scan crawl <ws> --url <url>` | BFS crawler |
+| `dribik scan content <ws> --url <url>` | Common-path content discovery |
 | `dribik scan tech <ws> --url <url>` | Tech-stack fingerprint |
 | `dribik scan headers <ws> --url <url>` | Security header audit |
 | `dribik scan xss <ws> --url <url>` | Reflected XSS probes |
@@ -119,6 +121,19 @@ dribik collection write ./my-engagement --out ./acme.postman_collection.json
 | `dribik scan lfi <ws> --url <url>` | LFI / path traversal |
 | `dribik scan jwt <ws> --token <t>` | JWT audit |
 | `dribik scan redirect <ws> --url <url>` | Open redirect probes |
+
+### Raw HTTP requests (active — consent required)
+
+Import a request copied from Burp Suite, ZAP, Caido, or a proxy log and replay it through
+Dirbik's rate limit, scope checks, consent gate, proxy configuration, and audit log.  Transport
+headers such as `Host`, `Content-Length`, and proxy credentials are rebuilt or omitted safely.
+
+```bash
+dribik request replay my-engagement --file request.txt --scheme https --import-graph
+```
+
+Use `--follow-redirects` only if every potential redirect destination is also in scope and
+authorized. Redirects are off by default.
 
 ### Subdomains
 

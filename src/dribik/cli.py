@@ -14,8 +14,10 @@ from dribik import __version__
 from dribik.collection import to_postman
 from dribik.consent import grant
 from dribik.consent import require as consent_require
+from dribik.content import discover_content
 from dribik.graph import add_endpoint, add_host, counts, import_bundle
 from dribik.models import Capability, FindingsFile, Scope
+from dribik.raw_http import parse_raw_request, replay_raw_request
 from dribik.recon import extract_tokens, fetch_robots, fetch_sitemap, passive_dns_crtsh, recon_plan
 from dribik.report import write_html_report, write_json_report, write_report, write_sarif_report
 from dribik.scope import classify
@@ -179,6 +181,46 @@ def graph_status(workspace: Path) -> None:
     """Print a node-count summary of the asset graph."""
     ws = Workspace(workspace)
     click.echo(json.dumps(counts(ws.load_graph()), indent=2))
+
+
+# ---------------------------------------------------------------------------
+# request replay
+# ---------------------------------------------------------------------------
+@main.group("request")
+def request_group() -> None:
+    """Import and replay authorized raw HTTP requests."""
+
+
+@request_group.command("replay")
+@click.argument("workspace", type=click.Path(path_type=Path))
+@click.option("--file", "file_", required=True, type=click.Path(path_type=Path, exists=True, dir_okay=False))
+@click.option("--scheme", type=click.Choice(["https", "http"]), default="https", show_default=True,
+              help="Scheme used for origin-form requests (for example, GET /path HTTP/1.1).")
+@click.option("--timeout", type=click.IntRange(1, 120), default=10, show_default=True)
+@click.option("--follow-redirects", is_flag=True, default=False,
+              help="Follow redirects only when every destination is authorized.")
+@click.option("--import-graph", is_flag=True, default=False, help="Store the replayed endpoint in the graph.")
+def request_replay(
+    workspace: Path, file_: Path, scheme: str, timeout: int, follow_redirects: bool, import_graph: bool
+) -> None:
+    """Replay one raw HTTP/1.x request after scope and consent checks."""
+    try:
+        request = parse_raw_request(file_.read_bytes())
+        url = request.url(scheme)
+    except ValueError as exc:
+        raise click.UsageError(f"Invalid raw request: {exc}") from exc
+    _require_authorized_target(workspace, url)
+    result = replay_raw_request(
+        request, scheme=scheme, timeout=timeout, follow_redirects=follow_redirects,
+    )
+    if import_graph:
+        ws = Workspace(workspace)
+        graph_obj = ws.load_graph()
+        add_endpoint(graph_obj, request.method, url, "raw-request-replay")
+        ws.save_graph(graph_obj)
+    if result.error:
+        raise click.ClickException(f"Replay failed: {result.error}")
+    click.echo(f"✓ {request.method} {url} → HTTP {result.status} ({result.response_time_ms:.0f} ms)")
 
 
 # ---------------------------------------------------------------------------
@@ -396,6 +438,55 @@ def scan_crawl(workspace: Path, url: str, depth: int, max_pages: int, import_gra
         for r in results:
             if r.status and r.status < 400:
                 add_endpoint(g, "GET", r.url, "dribik-crawl")
+        ws.save_graph(g)
+        click.echo(f"✓ Imported {len(results)} endpoint(s) into graph.")
+
+
+@scan.command("content")
+@click.argument("workspace", type=click.Path(path_type=Path))
+@click.option("--url", required=True, help="Target base URL for content discovery")
+@click.option("--wordlist", type=click.Path(path_type=Path, exists=True, dir_okay=False), default=None,
+              help="Optional custom path wordlist")
+@click.option("--max-candidates", type=click.IntRange(1, 2000), default=250, show_default=True,
+              help="Maximum candidate paths to probe")
+@click.option("--timeout", type=click.IntRange(1, 120), default=10, show_default=True)
+@click.option("--import-graph", is_flag=True, default=False, help="Add discovered endpoints to graph")
+def scan_content(
+    workspace: Path, url: str, wordlist: Path | None, max_candidates: int, timeout: int, import_graph: bool
+) -> None:
+    """Probe common content paths and suppress soft-404 noise."""
+    _require_authorized_target(workspace, url, "active_exploitation:content")
+    ws = Workspace(workspace)
+    wl = None
+    if wordlist:
+        wl = [
+            ln.strip()
+            for ln in wordlist.read_text(encoding="utf-8").splitlines()
+            if ln.strip() and not ln.startswith("#")
+        ]
+    click.echo(f"Discovering content paths under {url} …")
+    results = discover_content(
+        url,
+        wordlist=wl,
+        scope=ws.load_scope(),
+        timeout=timeout,
+        max_candidates=max_candidates,
+    )
+    if not results:
+        click.echo("  No content paths stood out.")
+        return
+    click.echo(f"  Found {len(results)} interesting path(s):")
+    for item in results:
+        status = item.get("status", "?")
+        content_type = item.get("content_type") or "unknown"
+        click.echo(f"    [{status}] {item['url']}  ({content_type})")
+    if import_graph:
+        g = ws.load_graph()
+        for item in results:
+            status = item.get("status")
+            if not isinstance(status, int):
+                continue
+            add_endpoint(g, "GET", str(item["url"]), "dribik-content", status=status)
         ws.save_graph(g)
         click.echo(f"✓ Imported {len(results)} endpoint(s) into graph.")
 

@@ -1,0 +1,19 @@
+# Controlled content discovery paths for authorized assessments
+.well-known/security.txt
+robots.txt
+sitemap.xml
+login
+signin
+admin
+dashboard
+account
+api
+health
+status
+docs
+documentation
+openapi.json
+swagger.json
+graphql
+actuator/health
+server-status

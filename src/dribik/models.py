@@ -18,6 +18,7 @@ ParamLocation = Literal["query", "body", "header", "path"]
 # Fine-grained capabilities:
 #   active_exploitation         — blanket: covers all sub-types below
 #   active_exploitation:crawl   — BFS web crawling
+#   active_exploitation:content — common-path content discovery
 #   active_exploitation:headers — security header probing
 #   active_exploitation:xss     — XSS injection
 #   active_exploitation:sqli    — SQL injection (including time-based)
@@ -30,6 +31,7 @@ Capability = Literal[
     "passive_import",
     "active_exploitation",
     "active_exploitation:crawl",
+    "active_exploitation:content",
     "active_exploitation:headers",
     "active_exploitation:xss",
     "active_exploitation:sqli",

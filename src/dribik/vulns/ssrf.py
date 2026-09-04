@@ -103,6 +103,9 @@ def scan_ssrf(
     asset_id: str = "",
     scope: Scope | None = None,
     test_post: bool = True,
+    test_json: bool = False,
+    header_names: list[str] | None = None,
+    cookie_names: list[str] | None = None,
 ) -> list[Finding]:
     """Probe GET params and POST body for SSRF vulnerabilities."""
     if scope and classify(scope, url) != "allow":
@@ -128,7 +131,6 @@ def scan_ssrf(
                 if not result.error and _is_ssrf_hit(result.body):
                     seen.add(dedup_get)
                     findings.append(_make_finding(param, injected, payload, result, asset_id, "GET query"))
-                    continue
 
             # POST
             if test_post:
@@ -138,5 +140,30 @@ def scan_ssrf(
                     if not result.error and _is_ssrf_hit(result.body):
                         seen.add(dedup_post)
                         findings.append(_make_finding(param, url, payload, result, asset_id, "POST body"))
+
+            if test_json:
+                dedup_json = f"ssrf:json:{param}"
+                if dedup_json not in seen:
+                    result = http_post(url, data={param: payload}, json_body=True, timeout=timeout)
+                    if not result.error and _is_ssrf_hit(result.body):
+                        seen.add(dedup_json)
+                        findings.append(_make_finding(param, url, payload, result, asset_id, "JSON body"))
+
+            for header_name in header_names or []:
+                dedup_header = f"ssrf:header:{header_name}"
+                if dedup_header not in seen:
+                    result = http_get(url, headers={header_name: payload}, timeout=timeout)
+                    if not result.error and _is_ssrf_hit(result.body):
+                        seen.add(dedup_header)
+                        findings.append(_make_finding(header_name, url, payload, result, asset_id, "HTTP header"))
+
+            for cookie_name in cookie_names or []:
+                dedup_cookie = f"ssrf:cookie:{cookie_name}"
+                if dedup_cookie not in seen:
+                    cookie_value = urllib.parse.quote(payload, safe="")
+                    result = http_get(url, headers={"Cookie": f"{cookie_name}={cookie_value}"}, timeout=timeout)
+                    if not result.error and _is_ssrf_hit(result.body):
+                        seen.add(dedup_cookie)
+                        findings.append(_make_finding(cookie_name, url, payload, result, asset_id, "Cookie"))
 
     return findings

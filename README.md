@@ -65,6 +65,7 @@ dribik scan ssrf    ./my-engagement --url "https://api.acme.com/fetch?url=x" --s
 dribik scan lfi     ./my-engagement --url "https://api.acme.com/file?path=x" --save
 dribik scan jwt     ./my-engagement --token "eyJ..." --save
 dribik scan crawl   ./my-engagement --url https://api.acme.com/ --import-graph
+dribik report sarif ./my-engagement --out ./reports/dribik.sarif
 
 # 6. Subdomain enumeration
 dribik subdomains enum      ./my-engagement --domain acme.com --import-graph
@@ -133,6 +134,7 @@ dribik collection write ./my-engagement --out ./acme.postman_collection.json
 | `dribik report write <ws> --out <file>` | Markdown report |
 | `dribik report html <ws> --out <file>` | HTML report |
 | `dribik report json <ws> --out <file>` | JSON report (CI-ready) |
+| `dribik report sarif <ws> --out <file>` | SARIF report for GitHub code scanning |
 | `dribik collection write <ws> --out <file>` | Postman collection |
 | `dribik findings import <ws> --file <json>` | Import findings |
 | `dribik findings score <ws>` | Re-score findings |
@@ -173,7 +175,7 @@ my-engagement/
 pytest tests/ -v
 ```
 
-The test suite covers: scope, consent, graph, scoring (CVSS), reports (Markdown/HTML/JSON), CLI (including consent gate enforcement), collection export, recon, and all vuln modules (XSS, SQLi, LFI, headers, JWT, open redirect) using mocks — no network required.
+The test suite covers: scope, consent, graph, scoring (CVSS), reports (Markdown/HTML/JSON/SARIF), CLI (including consent gate enforcement), collection export, recon, and all vuln modules (XSS, SQLi, LFI, headers, JWT, open redirect) using mocks plus a small loopback integration fixture — no network required.
 
 ---
 

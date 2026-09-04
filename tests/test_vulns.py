@@ -105,6 +105,25 @@ def test_xss_no_reflection_no_finding():
     assert findings == []
 
 
+def test_xss_supports_json_header_and_cookie_contexts():
+    payload = "<script>alert(1)</script>"
+    with mock.patch("dribik.vulns.xss.http_get", return_value=_mock_result(f"echo {payload}")) as get_mock, \
+         mock.patch("dribik.vulns.xss.http_post", return_value=_mock_result(f"echo {payload}")) as post_mock:
+        findings = scan_xss(
+            "http://x.test/?q=safe",
+            params=["q"],
+            payloads=[payload],
+            test_post=False,
+            test_json=True,
+            header_names=["X-Test"],
+            cookie_names=["session"],
+        )
+    assert len(findings) >= 3
+    assert any(call.kwargs.get("json_body") for call in post_mock.call_args_list)
+    assert any(call.kwargs.get("headers", {}).get("X-Test") == payload for call in get_mock.call_args_list)
+    assert any(call.kwargs.get("headers", {}).get("Cookie", "").startswith("session=") for call in get_mock.call_args_list)
+
+
 # ---------------------------------------------------------------------------
 # SQLi — mock HTTP to return DBMS error
 # ---------------------------------------------------------------------------
@@ -126,6 +145,25 @@ def test_sqli_clean_response_no_finding():
     assert findings == []
 
 
+def test_sqli_supports_json_header_and_cookie_contexts():
+    payload = "1' OR '1'='1"
+    with mock.patch("dribik.vulns.sqli.http_get", return_value=_mock_result("You have an error in your SQL syntax")) as get_mock, \
+         mock.patch("dribik.vulns.sqli.http_post", return_value=_mock_result("You have an error in your SQL syntax")) as post_mock:
+        findings = scan_sqli(
+            "http://x.test/?id=1",
+            params=["id"],
+            payloads=[payload],
+            test_post=False,
+            test_json=True,
+            header_names=["X-Test"],
+            cookie_names=["session"],
+        )
+    assert len(findings) >= 3
+    assert any(call.kwargs.get("json_body") for call in post_mock.call_args_list)
+    assert any(call.kwargs.get("headers", {}).get("X-Test") == payload for call in get_mock.call_args_list)
+    assert any(call.kwargs.get("headers", {}).get("Cookie", "").startswith("session=") for call in get_mock.call_args_list)
+
+
 # ---------------------------------------------------------------------------
 # LFI — mock HTTP to return /etc/passwd content
 # ---------------------------------------------------------------------------
@@ -138,6 +176,25 @@ def test_lfi_passwd_detected():
     assert len(findings) == 1
     assert findings[0].vuln_type == "LFI"
     assert findings[0].cwe_id == "CWE-22"
+
+
+def test_lfi_supports_json_header_and_cookie_contexts():
+    payload = "../../../../etc/passwd"
+    with mock.patch("dribik.vulns.lfi.http_get", return_value=_mock_result("root:x:0:0:root:/root:/bin/bash")) as get_mock, \
+         mock.patch("dribik.vulns.lfi.http_post", return_value=_mock_result("root:x:0:0:root:/root:/bin/bash")) as post_mock:
+        findings = scan_lfi(
+            "http://x.test/?file=index.php",
+            params=["file"],
+            payloads=[payload],
+            test_post=False,
+            test_json=True,
+            header_names=["X-Test"],
+            cookie_names=["session"],
+        )
+    assert len(findings) >= 3
+    assert any(call.kwargs.get("json_body") for call in post_mock.call_args_list)
+    assert any(call.kwargs.get("headers", {}).get("X-Test") == payload for call in get_mock.call_args_list)
+    assert any(call.kwargs.get("headers", {}).get("Cookie", "").startswith("session=") for call in get_mock.call_args_list)
 
 
 # ---------------------------------------------------------------------------
@@ -308,6 +365,25 @@ def test_ssrf_clean_response_no_finding():
             test_post=True,
         )
     assert findings == []
+
+
+def test_ssrf_supports_json_header_and_cookie_contexts():
+    payload = "http://169.254.169.254/latest/meta-data/"
+    with mock.patch("dribik.vulns.ssrf.http_get", return_value=_mock_result("ami-id: ami-0123456789abcdef0")) as get_mock, \
+         mock.patch("dribik.vulns.ssrf.http_post", return_value=_mock_result("ami-id: ami-0123456789abcdef0")) as post_mock:
+        findings = scan_ssrf(
+            "http://x.test/proxy?url=http://example.com",
+            params=["url"],
+            payloads=[payload],
+            test_post=False,
+            test_json=True,
+            header_names=["X-Test"],
+            cookie_names=["session"],
+        )
+    assert len(findings) >= 3
+    assert any(call.kwargs.get("json_body") for call in post_mock.call_args_list)
+    assert any(call.kwargs.get("headers", {}).get("X-Test") == payload for call in get_mock.call_args_list)
+    assert any(call.kwargs.get("headers", {}).get("Cookie", "").startswith("session=") for call in get_mock.call_args_list)
 
 
 def test_ssrf_post_probe_detected():

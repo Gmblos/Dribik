@@ -1,4 +1,4 @@
-"""Report generation — Markdown, HTML, and JSON output."""
+"""Report generation — Markdown, HTML, JSON, and SARIF output."""
 
 from __future__ import annotations
 
@@ -192,6 +192,82 @@ def write_json_report(
             }
             for f in findings
         ],
+    }
+    return json.dumps(payload, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# SARIF report (GitHub code scanning / security tooling)
+# ---------------------------------------------------------------------------
+def write_sarif_report(
+    *,
+    meta: WorkspaceMeta,
+    graph: Graph,
+    scope: Scope,
+    findings: list[Finding],
+) -> str:
+    """Return a SARIF 2.1.0 report containing in-scope findings only."""
+    apply_scores(findings)
+    level_by_severity = {
+        "critical": "error",
+        "high": "error",
+        "medium": "warning",
+        "low": "note",
+        "info": "note",
+    }
+    included: list[tuple[Finding, str]] = []
+    for finding in findings:
+        asset = _finding_asset(graph, finding)
+        finding.out_of_scope = classify(scope, asset) != "allow"
+        if not finding.out_of_scope:
+            included.append((finding, asset))
+
+    rules: dict[str, dict[str, object]] = {}
+    results: list[dict[str, object]] = []
+    for finding, asset in included:
+        rule_id = f"DRIBIK/{finding.cwe_id or finding.vuln_type.upper()}"
+        rules.setdefault(
+            rule_id,
+            {
+                "id": rule_id,
+                "name": finding.vuln_type,
+                "shortDescription": {"text": finding.vuln_type},
+                "fullDescription": {"text": finding.remediation or finding.summary or finding.title},
+                "helpUri": finding.references[0] if finding.references else "https://github.com/Gmblos/Dribik",
+                "properties": {"tags": [finding.cwe_id] if finding.cwe_id else []},
+            },
+        )
+        results.append(
+            {
+                "ruleId": rule_id,
+                "level": level_by_severity[finding.severity],
+                "message": {"text": finding.summary or finding.title},
+                "locations": [{"physicalLocation": {"artifactLocation": {"uri": asset}}}],
+                "properties": {
+                    "dribikFindingId": finding.id,
+                    "severity": finding.severity,
+                    "cvssScore": finding.cvss_score,
+                    "confidence": finding.confidence,
+                    "cwe": finding.cwe_id,
+                },
+            }
+        )
+
+    payload = {
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "Dribik",
+                    "version": meta.dribik_version,
+                    "informationUri": "https://github.com/Gmblos/Dribik",
+                    "rules": list(rules.values()),
+                }
+            },
+            "automationDetails": {"id": meta.program},
+            "results": results,
+        }],
     }
     return json.dumps(payload, indent=2)
 

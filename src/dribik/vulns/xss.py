@@ -82,6 +82,9 @@ def scan_xss(
     asset_id: str = "",
     scope: Scope | None = None,
     test_post: bool = True,
+    test_json: bool = False,
+    header_names: list[str] | None = None,
+    cookie_names: list[str] | None = None,
 ) -> list[Finding]:
     """
     Probe URL parameters (GET + POST body) for reflected XSS.
@@ -112,7 +115,6 @@ def scan_xss(
                 if dedup_key not in seen:
                     seen.add(dedup_key)
                     findings.append(_make_finding(param, injected_url, payload, result, asset_id, "GET query"))
-                break
 
             # --- POST body param ---
             if test_post:
@@ -122,6 +124,34 @@ def scan_xss(
                     if dedup_key not in seen:
                         seen.add(dedup_key)
                         findings.append(_make_finding(param, url, payload, post_result, asset_id, "POST body"))
-                    break
+
+            if test_json:
+                json_result = http_post(url, data={param: payload}, json_body=True, timeout=timeout)
+                if not json_result.error and payload.lower() in json_result.body.lower():
+                    dedup_key = f"xss:json:{param}"
+                    if dedup_key not in seen:
+                        seen.add(dedup_key)
+                        findings.append(_make_finding(param, url, payload, json_result, asset_id, "JSON body"))
+
+            for header_name in header_names or []:
+                header_result = http_get(url, headers={header_name: payload}, timeout=timeout)
+                if not header_result.error and payload.lower() in header_result.body.lower():
+                    dedup_key = f"xss:header:{header_name}"
+                    if dedup_key not in seen:
+                        seen.add(dedup_key)
+                        findings.append(
+                            _make_finding(header_name, url, payload, header_result, asset_id, "HTTP header")
+                        )
+
+            for cookie_name in cookie_names or []:
+                cookie_value = urllib.parse.quote(payload, safe="")
+                cookie_result = http_get(url, headers={"Cookie": f"{cookie_name}={cookie_value}"}, timeout=timeout)
+                if not cookie_result.error and payload.lower() in cookie_result.body.lower():
+                    dedup_key = f"xss:cookie:{cookie_name}"
+                    if dedup_key not in seen:
+                        seen.add(dedup_key)
+                        findings.append(
+                            _make_finding(cookie_name, url, payload, cookie_result, asset_id, "Cookie")
+                        )
 
     return findings

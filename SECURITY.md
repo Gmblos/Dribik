@@ -10,7 +10,7 @@
 
 Dribik is for **authorized** assessment only. Testing third-party hosts without permission is misuse of the tool and may be illegal.
 
-## Reporting vulnerabilities in Skillet itself
+## Reporting vulnerabilities in Dribik itself
 
 If you find a security issue **in this repository** (for example path traversal when writing reports, or a bypass of scope checks), email the maintainers privately or open a GitHub Security Advisory. Do not file a public issue with a working exploit.
 

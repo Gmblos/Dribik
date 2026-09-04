@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import get_args
 
@@ -16,13 +17,21 @@ from dribik.consent import require as consent_require
 from dribik.graph import add_endpoint, add_host, counts, import_bundle
 from dribik.models import Capability, FindingsFile, Scope
 from dribik.recon import extract_tokens, fetch_robots, fetch_sitemap, passive_dns_crtsh, recon_plan
-from dribik.report import write_html_report, write_json_report, write_report
+from dribik.report import write_html_report, write_json_report, write_report, write_sarif_report
 from dribik.scope import classify
 from dribik.scoring import apply_scores, risk_matrix
 from dribik.workspace import Workspace
 
 # All valid Capability literals — used for click.Choice
 _ALL_CAPABILITIES = list(get_args(Capability))
+_HTTP_FIELD_NAME_RE = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
+
+
+def _validate_http_field_names(values: tuple[str, ...], label: str) -> list[str]:
+    invalid = [value for value in values if not _HTTP_FIELD_NAME_RE.fullmatch(value)]
+    if invalid:
+        raise click.BadParameter(f"Invalid {label}: {', '.join(invalid)}")
+    return list(values)
 
 
 # ---------------------------------------------------------------------------
@@ -442,9 +451,12 @@ def scan_headers(workspace: Path, url: str, save: bool) -> None:
 @click.option("--url", required=True, help="Target URL")
 @click.option("--params", default="", help="Comma-separated parameter names (optional)")
 @click.option("--no-post", is_flag=True, default=False, help="Skip POST body injection")
+@click.option("--json-body", is_flag=True, default=False, help="Also probe JSON request bodies")
+@click.option("--header", "headers", multiple=True, help="Also probe a custom HTTP header name")
+@click.option("--cookie", "cookies", multiple=True, help="Also probe a cookie name")
 @click.option("--save", is_flag=True, default=False, help="Save findings to workspace")
 @click.option("--audit", is_flag=True, default=False, help="Deprecated: request auditing is always enabled")
-def scan_xss(workspace: Path, url: str, params: str, no_post: bool, save: bool, audit: bool) -> None:
+def scan_xss(workspace: Path, url: str, params: str, no_post: bool, json_body: bool, headers: tuple[str, ...], cookies: tuple[str, ...], save: bool, audit: bool) -> None:
     """Probe URL parameters (GET + POST) for reflected XSS."""
     _require_authorized_target(workspace, url, "active_exploitation:xss")
     if audit:
@@ -453,7 +465,16 @@ def scan_xss(workspace: Path, url: str, params: str, no_post: bool, save: bool, 
     param_list = [p.strip() for p in params.split(",") if p.strip()] or None
     click.echo(f"Scanning XSS: {url} …")
     ws = Workspace(workspace)
-    new_findings = _scan(url, params=param_list, asset_id=url, scope=ws.load_scope(), test_post=not no_post)
+    new_findings = _scan(
+        url,
+        params=param_list,
+        asset_id=url,
+        scope=ws.load_scope(),
+        test_post=not no_post,
+        test_json=json_body,
+        header_names=_validate_http_field_names(headers, "header name"),
+        cookie_names=_validate_http_field_names(cookies, "cookie name"),
+    )
     if not new_findings:
         click.echo("  No XSS found.")
         return
@@ -473,9 +494,12 @@ def scan_xss(workspace: Path, url: str, params: str, no_post: bool, save: bool, 
 @click.option("--url", required=True, help="Target URL")
 @click.option("--params", default="", help="Comma-separated parameter names (optional)")
 @click.option("--no-post", is_flag=True, default=False, help="Skip POST body injection")
+@click.option("--json-body", is_flag=True, default=False, help="Also probe JSON request bodies")
+@click.option("--header", "headers", multiple=True, help="Also probe a custom HTTP header name")
+@click.option("--cookie", "cookies", multiple=True, help="Also probe a cookie name")
 @click.option("--save", is_flag=True, default=False, help="Save findings to workspace")
 @click.option("--audit", is_flag=True, default=False, help="Deprecated: request auditing is always enabled")
-def scan_sqli(workspace: Path, url: str, params: str, no_post: bool, save: bool, audit: bool) -> None:
+def scan_sqli(workspace: Path, url: str, params: str, no_post: bool, json_body: bool, headers: tuple[str, ...], cookies: tuple[str, ...], save: bool, audit: bool) -> None:
     """Probe URL parameters (GET + POST) for SQL Injection (error-based + time-based)."""
     _require_authorized_target(workspace, url, "active_exploitation:sqli")
     if audit:
@@ -484,7 +508,16 @@ def scan_sqli(workspace: Path, url: str, params: str, no_post: bool, save: bool,
     param_list = [p.strip() for p in params.split(",") if p.strip()] or None
     click.echo(f"Scanning SQLi: {url} …")
     ws = Workspace(workspace)
-    new_findings = _scan(url, params=param_list, asset_id=url, scope=ws.load_scope(), test_post=not no_post)
+    new_findings = _scan(
+        url,
+        params=param_list,
+        asset_id=url,
+        scope=ws.load_scope(),
+        test_post=not no_post,
+        test_json=json_body,
+        header_names=_validate_http_field_names(headers, "header name"),
+        cookie_names=_validate_http_field_names(cookies, "cookie name"),
+    )
     if not new_findings:
         click.echo("  No SQLi found.")
         return
@@ -503,15 +536,28 @@ def scan_sqli(workspace: Path, url: str, params: str, no_post: bool, save: bool,
 @click.argument("workspace", type=click.Path(path_type=Path))
 @click.option("--url", required=True, help="Target URL")
 @click.option("--params", default="", help="Comma-separated parameter names (optional)")
+@click.option("--no-post", is_flag=True, default=False, help="Skip POST body injection")
+@click.option("--json-body", is_flag=True, default=False, help="Also probe JSON request bodies")
+@click.option("--header", "headers", multiple=True, help="Also probe a custom HTTP header name")
+@click.option("--cookie", "cookies", multiple=True, help="Also probe a cookie name")
 @click.option("--save", is_flag=True, default=False, help="Save findings to workspace")
-def scan_ssrf(workspace: Path, url: str, params: str, save: bool) -> None:
+def scan_ssrf(workspace: Path, url: str, params: str, no_post: bool, json_body: bool, headers: tuple[str, ...], cookies: tuple[str, ...], save: bool) -> None:
     """Probe URL parameters for SSRF (cloud metadata + internal service probes)."""
     _require_authorized_target(workspace, url, "active_exploitation:ssrf")
     from dribik.vulns.ssrf import scan_ssrf as _scan
     param_list = [p.strip() for p in params.split(",") if p.strip()] or None
     click.echo(f"Scanning SSRF: {url} …")
     ws = Workspace(workspace)
-    new_findings = _scan(url, params=param_list, asset_id=url, scope=ws.load_scope())
+    new_findings = _scan(
+        url,
+        params=param_list,
+        asset_id=url,
+        scope=ws.load_scope(),
+        test_post=not no_post,
+        test_json=json_body,
+        header_names=_validate_http_field_names(headers, "header name"),
+        cookie_names=_validate_http_field_names(cookies, "cookie name"),
+    )
     if not new_findings:
         click.echo("  No SSRF found.")
         return
@@ -530,15 +576,28 @@ def scan_ssrf(workspace: Path, url: str, params: str, save: bool) -> None:
 @click.argument("workspace", type=click.Path(path_type=Path))
 @click.option("--url", required=True, help="Target URL")
 @click.option("--params", default="", help="Comma-separated parameter names (optional)")
+@click.option("--no-post", is_flag=True, default=False, help="Skip POST body injection")
+@click.option("--json-body", is_flag=True, default=False, help="Also probe JSON request bodies")
+@click.option("--header", "headers", multiple=True, help="Also probe a custom HTTP header name")
+@click.option("--cookie", "cookies", multiple=True, help="Also probe a cookie name")
 @click.option("--save", is_flag=True, default=False, help="Save findings to workspace")
-def scan_lfi(workspace: Path, url: str, params: str, save: bool) -> None:
+def scan_lfi(workspace: Path, url: str, params: str, no_post: bool, json_body: bool, headers: tuple[str, ...], cookies: tuple[str, ...], save: bool) -> None:
     """Probe URL parameters for Local File Inclusion / Path Traversal."""
     _require_authorized_target(workspace, url, "active_exploitation:lfi")
     from dribik.vulns.lfi import scan_lfi as _scan
     param_list = [p.strip() for p in params.split(",") if p.strip()] or None
     click.echo(f"Scanning LFI: {url} …")
     ws = Workspace(workspace)
-    new_findings = _scan(url, params=param_list, asset_id=url, scope=ws.load_scope())
+    new_findings = _scan(
+        url,
+        params=param_list,
+        asset_id=url,
+        scope=ws.load_scope(),
+        test_post=not no_post,
+        test_json=json_body,
+        header_names=_validate_http_field_names(headers, "header name"),
+        cookie_names=_validate_http_field_names(cookies, "cookie name"),
+    )
     if not new_findings:
         click.echo("  No LFI found.")
         return
@@ -738,6 +797,23 @@ def report_json(workspace: Path, out: Path) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text, encoding="utf-8")
     click.echo(f"✓ JSON report written to {out}")
+
+
+@report.command("sarif")
+@click.argument("workspace", type=click.Path(path_type=Path))
+@click.option("--out", required=True, type=click.Path(path_type=Path))
+def report_sarif(workspace: Path, out: Path) -> None:
+    """Generate a SARIF 2.1.0 report for GitHub code scanning and CI tools."""
+    ws = Workspace(workspace)
+    text = write_sarif_report(
+        meta=ws.load_meta(),
+        graph=ws.load_graph(),
+        scope=ws.load_scope(),
+        findings=ws.load_findings().findings,
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    click.echo(f"✓ SARIF report written to {out}")
 
 
 # ---------------------------------------------------------------------------

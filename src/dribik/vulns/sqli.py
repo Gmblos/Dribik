@@ -8,7 +8,7 @@ import urllib.parse
 import uuid
 from pathlib import Path
 
-from dribik.models import CVSSVector, Finding, Scope
+from dribik.models import CVSSVector, Finding, ScanResult, Scope
 from dribik.scanner import http_get, http_post
 from dribik.scope import classify
 
@@ -66,6 +66,24 @@ def _is_time_payload(payload: str) -> bool:
     return any(m in payload.upper() for m in _SLEEP_MARKERS)
 
 
+def _request_for_context(url: str, param: str, payload: str, context: str, timeout: int) -> tuple[str, ScanResult]:
+    if context == "GET query":
+        injected_url = _inject_get(url, param, payload)
+        return injected_url, http_get(injected_url, timeout=timeout + 5)
+    if context == "POST body":
+        return url, http_post(url, data={param: payload}, timeout=timeout + 5)
+    if context == "JSON body":
+        return url, http_post(url, data={param: payload}, json_body=True, timeout=timeout + 5)
+    if context.startswith("HTTP header "):
+        header_name = context.removeprefix("HTTP header ")
+        return url, http_get(url, headers={header_name: payload}, timeout=timeout + 5)
+    if context.startswith("Cookie "):
+        cookie_name = context.removeprefix("Cookie ")
+        cookie_value = urllib.parse.quote(payload, safe="")
+        return url, http_get(url, headers={"Cookie": f"{cookie_name}={cookie_value}"}, timeout=timeout + 5)
+    raise ValueError(f"Unknown injection context: {context}")
+
+
 def _make_finding(param: str, url: str, payload: str, technique: str,
                   elapsed: float, dbms: str, asset_id: str, injection_type: str) -> Finding:
     fid = f"SQLI-{uuid.uuid4().hex[:8].upper()}"
@@ -108,14 +126,7 @@ def _probe(url: str, param: str, payload: str, injection_type: str, timeout: int
 
     is_time = _is_time_payload(payload)
     t0 = time.monotonic()
-    if injection_type == "GET":
-        parsed = urllib.parse.urlsplit(url)
-        qp = dict(urllib.parse.parse_qsl(parsed.query))
-        qp[param] = payload
-        injected_url = urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(qp)))
-        result = http_get(injected_url, timeout=timeout + 5)
-    else:
-        result = http_post(url, data={param: payload}, timeout=timeout + 5)
+    injected_url, result = _request_for_context(url, param, payload, injection_type, timeout)
     elapsed = time.monotonic() - t0
 
     if result.error:
@@ -124,13 +135,9 @@ def _probe(url: str, param: str, payload: str, injection_type: str, timeout: int
     # For time-based payloads: require BOTH elapsed time AND a second confirmation probe
     if is_time and elapsed >= _TIME_THRESHOLD:
         # Confirmation: send a harmless payload and verify it does NOT delay
-        if injection_type == "GET":
-            confirm_url = _inject_get(url, param, "1")
-            confirm = http_get(confirm_url, timeout=timeout)
-        else:
-            confirm = http_post(url, data={param: "1"}, timeout=timeout)
+        confirm_context = injection_type
         t_confirm = time.monotonic()
-        _ = confirm  # already sent
+        _, confirm = _request_for_context(url, param, "1", confirm_context, timeout)
         confirm_elapsed = time.monotonic() - t_confirm
         if confirm_elapsed >= _TIME_THRESHOLD * 0.5:
             # Server is just slow in general — not a true time-based hit
@@ -156,6 +163,9 @@ def scan_sqli(
     asset_id: str = "",
     scope: Scope | None = None,
     test_post: bool = True,
+    test_json: bool = False,
+    header_names: list[str] | None = None,
+    cookie_names: list[str] | None = None,
 ) -> list[Finding]:
     """Probe GET params and POST body for SQL Injection."""
     if scope and classify(scope, url) != "allow":
@@ -174,9 +184,14 @@ def scan_sqli(
 
     for param in probe_params:
         for payload in payloads:
-            _probe(url, param, payload, "GET", timeout, seen, findings, asset_id)
+            _probe(url, param, payload, "GET query", timeout, seen, findings, asset_id)
             if test_post:
-                _probe(url, param, payload, "POST", timeout, seen, findings, asset_id)
+                _probe(url, param, payload, "POST body", timeout, seen, findings, asset_id)
+            if test_json:
+                _probe(url, param, payload, "JSON body", timeout, seen, findings, asset_id)
+            for header_name in header_names or []:
+                _probe(url, header_name, payload, f"HTTP header {header_name}", timeout, seen, findings, asset_id)
+            for cookie_name in cookie_names or []:
+                _probe(url, cookie_name, payload, f"Cookie {cookie_name}", timeout, seen, findings, asset_id)
 
     return findings
-

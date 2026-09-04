@@ -3,7 +3,7 @@ import json
 
 from dribik.graph import add_host
 from dribik.models import Finding, Graph, Scope, ScopeRule, WorkspaceMeta
-from dribik.report import write_html_report, write_json_report, write_report
+from dribik.report import write_html_report, write_json_report, write_report, write_sarif_report
 
 
 def _base_fixtures():
@@ -67,3 +67,14 @@ def test_html_report_contains_severity_badge():
     assert "Executive Summary" in html
     # Severity stat cards present
     assert "Critical" in html
+
+
+def test_sarif_report_is_valid_and_excludes_out_of_scope_findings():
+    graph, meta, scope, findings = _base_fixtures()
+    raw = write_sarif_report(meta=meta, graph=graph, scope=scope, findings=findings)
+    data = json.loads(raw)
+    assert data["version"] == "2.1.0"
+    run = data["runs"][0]
+    assert run["tool"]["driver"]["name"] == "Dribik"
+    assert len(run["results"]) == 1
+    assert run["results"][0]["ruleId"] == "DRIBIK/OTHER"

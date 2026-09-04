@@ -52,6 +52,23 @@ scope + written consent → recon / scans → asset graph + audit trail → repo
 
 ## Installation
 
+### Debian / Ubuntu
+
+Release builds are available as self-contained Debian packages—no Python, pip, or source checkout
+is required. Download the `dribik_<version>_amd64.deb` asset from the
+[GitHub Releases page](https://github.com/Gmblos/Dribik/releases), then run:
+
+```bash
+sudo apt install ./dribik_<version>_amd64.deb
+dribik --version
+```
+
+The package currently targets 64-bit Debian/Ubuntu systems. A configured, signed APT repository is
+required before the shorter `sudo apt install dribik` command can work; see
+[Linux package distribution](packaging/README.md).
+
+### From source (developers)
+
 ```bash
 pip install -e ".[dev]"
 ```

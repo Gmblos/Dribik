@@ -1,0 +1,51 @@
+name: Release packages
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  debian-package:
+    name: Build Ubuntu/Debian package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build a self-contained executable
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . pyinstaller
+          pyinstaller --clean --noconfirm --onefile --name dribik --collect-all dribik src/dribik/__main__.py
+          dist/dribik --help
+      - name: Create Debian package
+        shell: bash
+        run: |
+          sudo gem install --no-document fpm
+          version="$(python -c 'from dribik import __version__; print(__version__.replace("-beta", "~beta"))')"
+          fpm --source dir --target deb --name dribik --version "$version" --iteration 1 \
+            --architecture amd64 --license Apache-2.0 --url https://github.com/Gmblos/Dribik \
+            --description "Authorized web pentesting workspace" \
+            dist/dribik=/usr/bin/dribik
+      - name: Install and smoke-test the package
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ./dribik_*_amd64.deb
+          dribik --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dribik-debian-package
+          path: dribik_*_amd64.deb
+          if-no-files-found: error
+      - name: Attach package to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dribik_*_amd64.deb

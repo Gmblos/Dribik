@@ -9,7 +9,9 @@ link.
 1. Run `ruff check src tests`, `mypy src`, and `pytest -q --cov=dribik --cov-fail-under=70`.
 2. Update `CHANGELOG.md` and the version in `pyproject.toml` and `src/dribik/__init__.py`.
 3. Commit the release, tag it (for example, `v0.1.0-beta`), and push the tag.
-4. Create a GitHub Release from the tag and paste the matching changelog section into its notes.
+4. The release workflow creates a self-contained Debian package, smoke-tests it with `apt install`,
+   and attaches it to the GitHub Release automatically.
+5. Confirm the generated release notes and package asset on GitHub.
 
 ## Repository settings worth enabling
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from dribik.models import Finding, Graph, Scope, WorkspaceMeta
 from dribik.scope import asset_ref, classify
@@ -58,8 +57,8 @@ def write_report(
         "",
         "## Executive Summary",
         "",
-        f"| Severity | Count |",
-        f"|----------|-------|",
+        "| Severity | Count |",
+        "|----------|-------|",
         f"| 🔴 Critical | {counts['critical']} |",
         f"| 🟠 High | {counts['high']} |",
         f"| 🟡 Medium | {counts['medium']} |",

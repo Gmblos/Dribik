@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import urllib.request
-import urllib.error
 import json
 import re
+import urllib.error
+import urllib.request
 from xml.etree import ElementTree
 
 from dribik.models import Graph
-
 
 # ---------------------------------------------------------------------------
 # Existing passive helpers

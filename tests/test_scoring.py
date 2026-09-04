@@ -1,6 +1,6 @@
 """Tests — confidence scoring (migrated to dribik + updated formula)."""
 from dribik.models import CVSSVector, Finding
-from dribik.scoring import score_finding, risk_matrix
+from dribik.scoring import risk_matrix, score_finding
 
 
 def test_validated_fresh_high_cvss_scores_max():

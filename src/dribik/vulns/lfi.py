@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import re
-import uuid
 import urllib.parse
+import uuid
 from pathlib import Path
 
 from dribik.models import CVSSVector, Finding, Scope
@@ -35,13 +35,13 @@ _BUILTIN = [
 ]
 
 _LFI_SIGNATURES = [
-    re.compile(r"root:x:0:0",         re.I),
-    re.compile(r"daemon:x:\d+",       re.I),
-    re.compile(r"\[extensions\]",     re.I),   # win.ini
-    re.compile(r"\[boot loader\]",    re.I),   # boot.ini
-    re.compile(r"HTTP_USER_AGENT|PHP_SELF", re.I),
-    re.compile(r"127\.0\.0\.1\s+localhost", re.I),
-    re.compile(r"\d+\.\d+\.\d+\.\d+ - - \[", re.I),
+    re.compile(r"root:x:0:0",         re.IGNORECASE),
+    re.compile(r"daemon:x:\d+",       re.IGNORECASE),
+    re.compile(r"\[extensions\]",     re.IGNORECASE),   # win.ini
+    re.compile(r"\[boot loader\]",    re.IGNORECASE),   # boot.ini
+    re.compile(r"HTTP_USER_AGENT|PHP_SELF", re.IGNORECASE),
+    re.compile(r"127\.0\.0\.1\s+localhost", re.IGNORECASE),
+    re.compile(r"\d+\.\d+\.\d+\.\d+ - - \[", re.IGNORECASE),
 ]
 
 _PATH_PARAMS = [

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import uuid
 import urllib.parse
+import uuid
 from pathlib import Path
 
 from dribik.models import CVSSVector, Finding, Scope
@@ -115,7 +115,8 @@ def scan_open_redirect(
             dedup_get = f"redirect:get:{param}"
             if dedup_get not in seen:
                 injected = _inject_get(url, param, payload)
-                result = http_get(injected, timeout=timeout, follow_redirects=True)
+                # Keep the 3xx response so Location can be evaluated directly.
+                result = http_get(injected, timeout=timeout, follow_redirects=False)
                 if not result.error and (result.status in (301, 302, 303, 307, 308) and _is_redirected(result)):
                     seen.add(dedup_get)
                     findings.append(_make_finding(param, injected, payload, result, asset_id, "GET query"))

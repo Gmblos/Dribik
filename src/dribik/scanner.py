@@ -7,13 +7,13 @@ import re
 import threading
 import time
 import urllib.error
-import urllib.request
 import urllib.parse
+import urllib.request
 from collections import deque
+from collections.abc import Callable
 from html.parser import HTMLParser
-from typing import Callable
 
-from dribik.models import AuditEntry, Graph, ScanResult, Scope, TechStack
+from dribik.models import AuditEntry, ScanResult, Scope, TechStack
 from dribik.scope import classify
 
 _BODY_READ_LIMIT = 65536   # 64 KB — full body for matching
@@ -67,7 +67,22 @@ def set_audit_callback(cb: Callable[[AuditEntry], None] | None) -> None:
     _audit_callback = cb
 
 
-def _build_opener() -> urllib.request.OpenerDirector:
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Return redirect responses to the caller instead of following them."""
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: object,
+        code: int,
+        msg: str,
+        headers: object,
+        newurl: str,
+    ) -> None:
+        return None
+
+
+def _build_opener(*, follow_redirects: bool = True) -> urllib.request.OpenerDirector:
     handlers: list = []
     if _proxy_url:
         handlers.append(urllib.request.ProxyHandler({
@@ -76,16 +91,18 @@ def _build_opener() -> urllib.request.OpenerDirector:
         }))
     else:
         handlers.append(urllib.request.ProxyHandler({}))  # disable env proxies
-    handlers.append(urllib.request.HTTPRedirectHandler())
+    handlers.append(urllib.request.HTTPRedirectHandler() if follow_redirects else _NoRedirectHandler())
     return urllib.request.build_opener(*handlers)
 
 
 def _do_request(
     req: urllib.request.Request,
     timeout: int,
+    *,
+    follow_redirects: bool = True,
 ) -> tuple[int, dict[str, str], bytes, str]:
     """Execute a request through the opener. Returns (status, headers, body, final_url)."""
-    opener = _build_opener()
+    opener = _build_opener(follow_redirects=follow_redirects)
     with opener.open(req, timeout=timeout) as resp:
         raw = resp.read(_BODY_READ_LIMIT)
         status: int = resp.status
@@ -125,7 +142,9 @@ def http_get(
         start = time.monotonic()
         try:
             req = urllib.request.Request(url, headers=request_headers, method="GET")
-            status, hdrs, raw, final_url = _do_request(req, timeout)
+            status, hdrs, raw, final_url = _do_request(
+                req, timeout, follow_redirects=follow_redirects
+            )
             elapsed = (time.monotonic() - start) * 1000
             body_text = raw.decode("utf-8", errors="replace")
             if final_url != url:
@@ -351,11 +370,11 @@ _WAF_HEADERS = {
     "x-waf-event-info": "AWS WAF", "x-ddos-protection": "DDoS Guard",
 }
 _CMS_BODY_RE = {
-    "WordPress": re.compile(r"/wp-content/|wp-json", re.I),
-    "Joomla":    re.compile(r"/components/com_|joomla", re.I),
-    "Drupal":    re.compile(r"sites/default/files|drupal\.org", re.I),
-    "Shopify":   re.compile(r"cdn\.shopify\.com", re.I),
-    "Magento":   re.compile(r"skin/frontend/|Mage\.", re.I),
+    "WordPress": re.compile(r"/wp-content/|wp-json", re.IGNORECASE),
+    "Joomla":    re.compile(r"/components/com_|joomla", re.IGNORECASE),
+    "Drupal":    re.compile(r"sites/default/files|drupal\.org", re.IGNORECASE),
+    "Shopify":   re.compile(r"cdn\.shopify\.com", re.IGNORECASE),
+    "Magento":   re.compile(r"skin/frontend/|Mage\.", re.IGNORECASE),
 }
 
 

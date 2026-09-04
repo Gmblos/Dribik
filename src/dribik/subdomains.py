@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import socket
-import importlib.resources
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 # Dangling CNAME fingerprints for common services
 _TAKEOVER_FINGERPRINTS: dict[str, list[str]] = {

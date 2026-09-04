@@ -5,22 +5,27 @@ the HTTP layer so no real network calls are made.
 """
 from __future__ import annotations
 
-import base64
 import json
-import unittest.mock as mock
+from unittest import mock
 
-import pytest
-
+from dribik.models import ScanResult
+from dribik.scanner import http_get
+from dribik.vulns.headers import evaluate_from_result
+from dribik.vulns.jwt_audit import _b64url_encode, _decode_jwt, audit_jwt
+from dribik.vulns.lfi import scan_lfi
+from dribik.vulns.open_redirect import scan_open_redirect
+from dribik.vulns.sqli import scan_sqli
+from dribik.vulns.xss import scan_xss
 
 # ---------------------------------------------------------------------------
 # JWT audit — pure logic, no HTTP
 # ---------------------------------------------------------------------------
-from dribik.vulns.jwt_audit import audit_jwt, _decode_jwt, _b64url_encode
 
 
 def _make_jwt(header: dict, payload: dict, secret: str = "", alg: str = "HS256") -> str:
     """Craft a minimal JWT for testing."""
-    import hashlib, hmac
+    import hashlib
+    import hmac
     h = _b64url_encode(json.dumps(header, separators=(",", ":")).encode())
     p = _b64url_encode(json.dumps(payload, separators=(",", ":")).encode())
     if alg == "none":
@@ -77,12 +82,10 @@ def test_jwt_audit_all_findings_have_cwe():
 # ---------------------------------------------------------------------------
 # XSS — mock HTTP to return payload reflection
 # ---------------------------------------------------------------------------
-from dribik.vulns.xss import scan_xss
-from dribik.models import ScanResult
 
 
 def _mock_result(body: str, status: int = 200) -> ScanResult:
-    return ScanResult(url="http://x.test/?q=PAYLOAD", status=status, body_snippet=body)
+    return ScanResult(url="http://x.test/?q=PAYLOAD", status=status, body=body)
 
 
 def test_xss_reflected_detected():
@@ -104,7 +107,6 @@ def test_xss_no_reflection_no_finding():
 # ---------------------------------------------------------------------------
 # SQLi — mock HTTP to return DBMS error
 # ---------------------------------------------------------------------------
-from dribik.vulns.sqli import scan_sqli
 
 
 def test_sqli_error_based_detected():
@@ -126,7 +128,6 @@ def test_sqli_clean_response_no_finding():
 # ---------------------------------------------------------------------------
 # LFI — mock HTTP to return /etc/passwd content
 # ---------------------------------------------------------------------------
-from dribik.vulns.lfi import scan_lfi
 
 
 def test_lfi_passwd_detected():
@@ -141,7 +142,6 @@ def test_lfi_passwd_detected():
 # ---------------------------------------------------------------------------
 # Security headers — mock HTTP response headers
 # ---------------------------------------------------------------------------
-from dribik.vulns.headers import evaluate_from_result
 
 
 def test_headers_missing_hsts_flagged():
@@ -194,7 +194,6 @@ def test_headers_all_present_no_critical_findings():
 # ---------------------------------------------------------------------------
 # Open redirect — mock HTTP returning a redirect to evil.com
 # ---------------------------------------------------------------------------
-from dribik.vulns.open_redirect import scan_open_redirect
 
 
 def test_open_redirect_detected():
@@ -215,3 +214,18 @@ def test_open_redirect_no_redirect_no_finding():
     with mock.patch("dribik.vulns.open_redirect.http_get", return_value=ok_result):
         findings = scan_open_redirect("http://x.test/", params=["next"], payloads=["https://evil.com"])
     assert findings == []
+
+
+def test_http_get_preserves_redirect_when_requested(monkeypatch):
+    import io
+    import urllib.error
+
+    def fake_open(self, req, timeout=10):
+        raise urllib.error.HTTPError(
+            req.full_url, 302, "Found", {"Location": "https://evil.com"}, io.BytesIO()
+        )
+
+    monkeypatch.setattr("urllib.request.OpenerDirector.open", fake_open)
+    result = http_get("https://example.test/redirect", follow_redirects=False, max_retries=0)
+    assert result.status == 302
+    assert result.headers["location"] == "https://evil.com"

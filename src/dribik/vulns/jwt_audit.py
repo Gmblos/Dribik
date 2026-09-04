@@ -140,8 +140,8 @@ def audit_jwt(
                             vuln_type="JWT",
                             asset_id=asset_id or "jwt-token",
                             summary=(
-                                f"The JWT HS256 secret is weak and was brute-forced. "
-                                f"An attacker can forge arbitrary tokens."
+                                "The JWT HS256 secret is weak and was brute-forced. "
+                                "An attacker can forge arbitrary tokens."
                             ),
                             proof_of_concept=f"Secret found: `{secret}`",
                             remediation=(

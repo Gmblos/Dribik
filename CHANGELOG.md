@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.1-beta — 2026-09-02
+## 0.0.2-beta — 2026-09-04
 
 ### Added
 
@@ -8,12 +8,15 @@
 - Unified asset graph with merge/dedupe and source provenance
 - Scope / ROE matching (domains, host suffixes, URL prefixes, explicit denials)
 - Per-target consent records (capability + timestamp + operator)
-- Passive-first recon **plan** (no active enumerator)
+- Passive-first recon plan and certificate-transparency discovery
 - Token extraction from known endpoints and JS routes
 - Finding confidence scoring (template age + response-diff agreement)
-- Markdown report and Postman Collection v2.1 export
+- Markdown, HTML, and JSON reports plus Postman Collection v2.1 export
 - CLI, tests, GitHub Actions CI, contribution and security policy
+- Fine-grained scope and consent gates for every active HTTP scan
+- Append-only request audit trail for every active HTTP scan
+- Redirect-preserving HTTP mode for reliable open-redirect checks
 
 ### Not included (by design)
 
-- Subdomain brute-force, HTTP fuzzing, vulnerability templates, injection or exploitation engines
+- Credential harvesting, exploit chaining, C2 integration, or testing outside written authorization

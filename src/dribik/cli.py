@@ -11,11 +11,12 @@ import yaml
 
 from dribik import __version__
 from dribik.collection import to_postman
-from dribik.consent import grant, require as consent_require
+from dribik.consent import grant
+from dribik.consent import require as consent_require
 from dribik.graph import add_endpoint, add_host, counts, import_bundle
 from dribik.models import Capability, FindingsFile, Scope
-from dribik.recon import extract_tokens, recon_plan, passive_dns_crtsh, fetch_robots, fetch_sitemap
-from dribik.report import write_report, write_html_report, write_json_report
+from dribik.recon import extract_tokens, fetch_robots, fetch_sitemap, passive_dns_crtsh, recon_plan
+from dribik.report import write_html_report, write_json_report, write_report
 from dribik.scope import classify
 from dribik.scoring import apply_scores, risk_matrix
 from dribik.workspace import Workspace
@@ -36,7 +37,7 @@ _ALL_CAPABILITIES = list(get_args(Capability))
 @click.pass_context
 def main(ctx: click.Context, rate: float, proxy: str | None) -> None:
     """Dribik — authorized web pentesting workspace (0.0.2-beta)."""
-    from dribik.scanner import set_rate_limit, set_proxy
+    from dribik.scanner import set_proxy, set_rate_limit
     set_rate_limit(rate)
     if proxy:
         set_proxy(proxy)
@@ -214,6 +215,7 @@ def recon_passive_dns(workspace: Path, domain: str, import_graph: bool) -> None:
 @click.option("--import-graph", is_flag=True, default=False, help="Add discovered URLs to asset graph")
 def recon_robots_cmd(workspace: Path, url: str, import_graph: bool) -> None:
     """Fetch and parse robots.txt and sitemap.xml."""
+    _require_authorized_target(workspace, url)
     click.echo(f"Fetching {url}/robots.txt …")
     robots = fetch_robots(url)
     click.echo(f"  Disallowed paths: {len(robots['disallowed_paths'])}")
@@ -303,9 +305,38 @@ def _require_active_consent(workspace: Path, target: str, capability: str = "act
 
 
 def _target_host(url: str) -> str:
-    """Extract the hostname from a URL for consent lookup."""
+    """Extract and validate a hostname from an HTTP(S) URL."""
     from urllib.parse import urlsplit
-    return urlsplit(url).hostname or url
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise click.UsageError("Provide an absolute HTTP(S) URL, e.g. https://app.example.com/")
+    return parsed.hostname.lower()
+
+
+def _require_authorized_target(workspace: Path, url: str, capability: str = "active_exploitation") -> None:
+    """Require an in-scope HTTP(S) target, valid consent, and request auditing."""
+    target = _target_host(url)
+    ws = Workspace(workspace)
+    if classify(ws.load_scope(), url) != "allow":
+        raise click.UsageError(
+            f"Target '{url}' is not in the allowed scope. Load an allow rule before scanning."
+        )
+    _require_active_consent(workspace, target, capability)
+    ws.enable_audit_logging()
+
+
+def _require_authorized_host(workspace: Path, host: str, capability: str = "active_exploitation") -> None:
+    """Require an in-scope host/domain and valid consent before a network action."""
+    host = host.strip().lower().rstrip(".")
+    if not host or "/" in host or ":" in host:
+        raise click.UsageError("Provide a valid host or domain name.")
+    ws = Workspace(workspace)
+    if classify(ws.load_scope(), host) != "allow":
+        raise click.UsageError(
+            f"Target '{host}' is not in the allowed scope. Load an allow rule before scanning."
+        )
+    _require_active_consent(workspace, host, capability)
+    ws.enable_audit_logging()
 
 
 def _enable_audit(workspace: Path) -> None:
@@ -329,7 +360,7 @@ def scan() -> None:
 @click.option("--import-graph", is_flag=True, default=False, help="Add discovered endpoints to graph")
 def scan_crawl(workspace: Path, url: str, depth: int, max_pages: int, import_graph: bool) -> None:
     """BFS web crawler — discovers URLs respecting scope."""
-    _require_active_consent(workspace, _target_host(url))
+    _require_authorized_target(workspace, url, "active_exploitation:crawl")
     from dribik.scanner import crawl
     ws = Workspace(workspace)
     scope_obj = ws.load_scope()
@@ -353,8 +384,8 @@ def scan_crawl(workspace: Path, url: str, depth: int, max_pages: int, import_gra
 @click.option("--url", required=True, help="Target URL to fingerprint")
 def scan_tech(workspace: Path, url: str) -> None:
     """Fingerprint server technology stack from HTTP headers and response body."""
-    _require_active_consent(workspace, _target_host(url))
-    from dribik.scanner import http_get, detect_tech_stack
+    _require_authorized_target(workspace, url)
+    from dribik.scanner import detect_tech_stack, http_get
     click.echo(f"Fingerprinting {url} …")
     result = http_get(url)
     if result.error:
@@ -374,7 +405,7 @@ def scan_tech(workspace: Path, url: str) -> None:
 @click.option("--save", is_flag=True, default=False, help="Save findings to workspace")
 def scan_headers(workspace: Path, url: str, save: bool) -> None:
     """Check HTTP security headers (HSTS, CSP, X-Frame-Options, CORS, etc.)."""
-    _require_active_consent(workspace, _target_host(url))
+    _require_authorized_target(workspace, url, "active_exploitation:headers")
     from dribik.vulns.headers import check_security_headers
     click.echo(f"Checking security headers: {url} …")
     checks, new_findings = check_security_headers(url)
@@ -403,7 +434,7 @@ def scan_headers(workspace: Path, url: str, save: bool) -> None:
 @click.option("--audit", is_flag=True, default=False, help="Log all requests to audit.jsonl")
 def scan_xss(workspace: Path, url: str, params: str, no_post: bool, save: bool, audit: bool) -> None:
     """Probe URL parameters (GET + POST) for reflected XSS."""
-    _require_active_consent(workspace, _target_host(url), "active_exploitation:xss")
+    _require_authorized_target(workspace, url, "active_exploitation:xss")
     if audit:
         _enable_audit(workspace)
     from dribik.vulns.xss import scan_xss as _scan
@@ -434,7 +465,7 @@ def scan_xss(workspace: Path, url: str, params: str, no_post: bool, save: bool, 
 @click.option("--audit", is_flag=True, default=False, help="Log all requests to audit.jsonl")
 def scan_sqli(workspace: Path, url: str, params: str, no_post: bool, save: bool, audit: bool) -> None:
     """Probe URL parameters (GET + POST) for SQL Injection (error-based + time-based)."""
-    _require_active_consent(workspace, _target_host(url), "active_exploitation:sqli")
+    _require_authorized_target(workspace, url, "active_exploitation:sqli")
     if audit:
         _enable_audit(workspace)
     from dribik.vulns.sqli import scan_sqli as _scan
@@ -463,7 +494,7 @@ def scan_sqli(workspace: Path, url: str, params: str, no_post: bool, save: bool,
 @click.option("--save", is_flag=True, default=False, help="Save findings to workspace")
 def scan_ssrf(workspace: Path, url: str, params: str, save: bool) -> None:
     """Probe URL parameters for SSRF (cloud metadata + internal service probes)."""
-    _require_active_consent(workspace, _target_host(url))
+    _require_authorized_target(workspace, url, "active_exploitation:ssrf")
     from dribik.vulns.ssrf import scan_ssrf as _scan
     param_list = [p.strip() for p in params.split(",") if p.strip()] or None
     click.echo(f"Scanning SSRF: {url} …")
@@ -490,7 +521,7 @@ def scan_ssrf(workspace: Path, url: str, params: str, save: bool) -> None:
 @click.option("--save", is_flag=True, default=False, help="Save findings to workspace")
 def scan_lfi(workspace: Path, url: str, params: str, save: bool) -> None:
     """Probe URL parameters for Local File Inclusion / Path Traversal."""
-    _require_active_consent(workspace, _target_host(url))
+    _require_authorized_target(workspace, url, "active_exploitation:lfi")
     from dribik.vulns.lfi import scan_lfi as _scan
     param_list = [p.strip() for p in params.split(",") if p.strip()] or None
     click.echo(f"Scanning LFI: {url} …")
@@ -542,7 +573,7 @@ def scan_jwt(workspace: Path, token: str, save: bool) -> None:
 @click.option("--save", is_flag=True, default=False, help="Save findings to workspace")
 def scan_redirect(workspace: Path, url: str, params: str, save: bool) -> None:
     """Probe URL parameters for open redirect vulnerabilities."""
-    _require_active_consent(workspace, _target_host(url))
+    _require_authorized_target(workspace, url, "active_exploitation:redirect")
     from dribik.vulns.open_redirect import scan_open_redirect
     param_list = [p.strip() for p in params.split(",") if p.strip()] or None
     click.echo(f"Scanning open redirects: {url} …")
@@ -578,6 +609,7 @@ def subdomains() -> None:
 @click.option("--import-graph", is_flag=True, default=False, help="Add discovered hosts to graph")
 def subdomains_enum(workspace: Path, domain: str, wordlist: Path | None, workers: int, import_graph: bool) -> None:
     """DNS brute-force subdomain enumeration."""
+    _require_authorized_host(workspace, domain)
     from dribik.subdomains import enumerate_subdomains
     wl = None
     if wordlist:
@@ -605,8 +637,9 @@ def subdomains_enum(workspace: Path, domain: str, wordlist: Path | None, workers
 @click.option("--save", is_flag=True, default=False, help="Save finding if vulnerable")
 def subdomains_takeover(workspace: Path, fqdn: str, save: bool) -> None:
     """Check a subdomain for potential takeover vulnerability."""
+    _require_authorized_host(workspace, fqdn)
+    from dribik.models import CVSSVector, Finding
     from dribik.subdomains import check_subdomain_takeover
-    from dribik.models import Finding, CVSSVector
     click.echo(f"Checking takeover risk for {fqdn} …")
     result = check_subdomain_takeover(fqdn)
     if result["vulnerable"]:

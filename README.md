@@ -16,7 +16,7 @@ Dribik is a Python CLI toolkit for structured, consent-tracked web penetration t
 | **Active scanners** | XSS, SQLi (error + time-based), SSRF, LFI, open redirect, security headers, JWT audit |
 | **Crawler** | BFS crawler respecting scope rules |
 | **Subdomain enum** | DNS brute-force + subdomain takeover detection |
-| **Passive recon** | crt.sh certificate transparency, robots.txt, sitemap.xml |
+| **Recon** | Passive crt.sh discovery, plus authorized robots.txt and sitemap analysis |
 | **CVSS scoring** | CVSS v3.1 base score on every finding, risk matrix output |
 | **Reports** | Markdown, HTML (self-contained), JSON (CI-ready) |
 | **Postman export** | In-scope endpoints exported as a Postman v2.1 collection |
@@ -53,7 +53,7 @@ dribik consent grant ./my-engagement \
   --operator "alice" \
   --note "SOW ref #1234"
 
-# 4. Passive recon (no target contact)
+# 4. Recon: certificate transparency is passive; robots/sitemaps require consent
 dribik recon passive-dns ./my-engagement --domain acme.com --import-graph
 dribik recon robots ./my-engagement --url https://acme.com --import-graph
 
@@ -102,7 +102,7 @@ dribik collection write ./my-engagement --out ./acme.postman_collection.json
 | `dribik recon plan <ws>` | Passive recon plan from graph |
 | `dribik recon tokens <ws>` | Extract path/param tokens |
 | `dribik recon passive-dns <ws> --domain <d>` | crt.sh CT log lookup |
-| `dribik recon robots <ws> --url <url>` | robots.txt + sitemap |
+| `dribik recon robots <ws> --url <url>` | Authorized robots.txt + sitemap discovery |
 
 ### Scan (active — consent required)
 
@@ -141,7 +141,7 @@ dribik collection write ./my-engagement --out ./acme.postman_collection.json
 
 ## Consent model
 
-Every `scan` and `subdomains` command calls `consent.require()` before sending any payload to a target. If no matching `active_exploitation` consent record exists for the target host, the command exits immediately with a non-zero code.
+Every command that contacts a target (`scan`, `subdomains`, and `recon robots`) requires both an allowed scope rule and matching consent before it sends a request. Each request is appended to `audit.jsonl` in the workspace.
 
 ```
 Error: No valid consent for capability 'active_exploitation' on target 'example.com'.

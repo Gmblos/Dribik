@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dribik.models import Finding
 
-
 # CVSS → confidence weight mapping
 _CVSS_WEIGHT = {
     (0.0, 4.0): 0.1,

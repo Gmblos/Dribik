@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import re
-import uuid
 import urllib.parse
+import uuid
 from pathlib import Path
 
 from dribik.models import CVSSVector, Finding, Scope
@@ -34,11 +34,11 @@ _BUILTIN = [
 ]
 
 _HIT_PATTERNS = [
-    re.compile(r"ami-id|instance-id|local-ipv4|security-credentials|iam", re.I),
-    re.compile(r"computeMetadata|serviceAccounts", re.I),
-    re.compile(r"-ERR|+OK|WRONGTYPE|NOAUTH", re.I),        # Redis
-    re.compile(r'"version"\s*:\s*"\d+\.\d+\.\d+"', re.I),  # Elasticsearch/CouchDB
-    re.compile(r"root:x:0:0", re.I),                        # /etc/passwd via file://
+    re.compile(r"ami-id|instance-id|local-ipv4|security-credentials|iam", re.IGNORECASE),
+    re.compile(r"computeMetadata|serviceAccounts", re.IGNORECASE),
+    re.compile(r"-ERR|\+OK|WRONGTYPE|NOAUTH", re.IGNORECASE),        # Redis
+    re.compile(r'"version"\s*:\s*"\d+\.\d+\.\d+"', re.IGNORECASE),  # Elasticsearch/CouchDB
+    re.compile(r"root:x:0:0", re.IGNORECASE),                        # /etc/passwd via file://
 ]
 
 _SSRF_PARAMS = [

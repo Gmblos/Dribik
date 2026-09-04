@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import re
 import time
-import uuid
 import urllib.parse
+import uuid
 from pathlib import Path
 
 from dribik.models import CVSSVector, Finding, Scope
@@ -32,15 +32,15 @@ _BUILTIN = [
 ]
 
 _ERROR_PATTERNS: dict[str, list[re.Pattern]] = {
-    "MySQL":      [re.compile(r"you have an error in your sql syntax", re.I),
-                   re.compile(r"warning: mysql", re.I)],
-    "PostgreSQL": [re.compile(r"pg_query\(\)|pg_exec\(\)", re.I),
-                   re.compile(r"postgresql.*error", re.I)],
-    "MSSQL":      [re.compile(r"microsoft ole db provider for sql server", re.I),
-                   re.compile(r"unclosed quotation mark after the character string", re.I)],
-    "Oracle":     [re.compile(r"ora-\d{5}", re.I)],
-    "SQLite":     [re.compile(r"sqlite_error|sqlite3.operationalerror", re.I)],
-    "Generic":    [re.compile(r"sql syntax|sql error|unrecognized token", re.I)],
+    "MySQL":      [re.compile(r"you have an error in your sql syntax", re.IGNORECASE),
+                   re.compile(r"warning: mysql", re.IGNORECASE)],
+    "PostgreSQL": [re.compile(r"pg_query\(\)|pg_exec\(\)", re.IGNORECASE),
+                   re.compile(r"postgresql.*error", re.IGNORECASE)],
+    "MSSQL":      [re.compile(r"microsoft ole db provider for sql server", re.IGNORECASE),
+                   re.compile(r"unclosed quotation mark after the character string", re.IGNORECASE)],
+    "Oracle":     [re.compile(r"ora-\d{5}", re.IGNORECASE)],
+    "SQLite":     [re.compile(r"sqlite_error|sqlite3.operationalerror", re.IGNORECASE)],
+    "Generic":    [re.compile(r"sql syntax|sql error|unrecognized token", re.IGNORECASE)],
 }
 
 _SLEEP_MARKERS = {"SLEEP(", "WAITFOR DELAY"}

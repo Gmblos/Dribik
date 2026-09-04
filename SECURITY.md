@@ -4,11 +4,11 @@
 
 | Version | Support |
 | --- | --- |
-| 0.0.1-beta | Active |
+| 0.0.2-beta | Active |
 
-## Using Skillet
+## Using Dribik
 
-Skillet is for **authorized** assessment only. Loading third-party hosts you do not have permission to test is misuse of the tool and may be illegal.
+Dribik is for **authorized** assessment only. Testing third-party hosts without permission is misuse of the tool and may be illegal.
 
 ## Reporting vulnerabilities in Skillet itself
 

@@ -1,8 +1,9 @@
 """Tests — report generation (migrated to dribik)."""
+import json
+
 from dribik.graph import add_host
 from dribik.models import Finding, Graph, Scope, ScopeRule, WorkspaceMeta
-from dribik.report import write_report, write_json_report, write_html_report
-import json
+from dribik.report import write_html_report, write_json_report, write_report
 
 
 def _base_fixtures():

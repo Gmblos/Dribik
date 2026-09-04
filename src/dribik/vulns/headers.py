@@ -5,8 +5,7 @@ from __future__ import annotations
 import uuid
 
 from dribik.models import CVSSVector, Finding, HeaderCheckResult, Severity
-from dribik.scanner import http_get, ScanResult
-
+from dribik.scanner import ScanResult, http_get
 
 # Header policy definitions: (header_name, severity_if_missing, note)
 _REQUIRED_HEADERS: list[tuple[str, Severity, str]] = [

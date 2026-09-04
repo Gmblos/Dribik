@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
-import uuid
 import urllib.parse
+import uuid
 from pathlib import Path
 
 from dribik.models import CVSSVector, Finding, Scope

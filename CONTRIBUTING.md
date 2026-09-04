@@ -1,19 +1,20 @@
-# Contributing to Skillet
+# Contributing to Dribik
 
-Thank you for helping with the authorized-assessment workspace.
+Thank you for helping improve this authorized-assessment workspace.
 
-## Scope of contributions (0.0.1-beta)
+## Scope of contributions (0.1.0-beta)
 
 **Welcome**
 
-- Graph merge/dedupe bugs, scope matching, scoring, report/collection export
+- Graph merge/dedupe bugs, scope matching, consent enforcement, scoring, report/collection export
 - Tests, docs, CI, accessibility of the CLI
-- Importers for **already collected** JSON/CSV inventories (no live scanners)
+- Importers for **already collected** JSON/CSV inventories
+- Safety-preserving improvements to the existing authorized scan modules
 
 **Not accepted**
 
 - Exploit payloads, proof-of-concept attacks, or “how to reproduce” exploit steps
-- Fuzzing / brute-force / injection / template-scan engines
+- Unbounded fuzzing, brute-force, exploit chains, or injection engines that bypass the workspace gates
 - Wordlists intended for attacking live services
 - Circumvention of consent or scope gates
 
@@ -24,6 +25,7 @@ python -m venv .venv
 pip install -e ".[dev]"
 pytest
 ruff check src tests
+mypy src
 ```
 
 ## Pull requests

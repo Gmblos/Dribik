@@ -1,8 +1,35 @@
 # Dribik — Authorized Web Pentesting Workspace
 
+[![CI](https://github.com/Gmblos/Dribik/actions/workflows/ci.yml/badge.svg)](https://github.com/Gmblos/Dribik/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-0B66C3.svg)](LICENSE)
+[![Status: beta](https://img.shields.io/badge/status-beta-F59E0B.svg)](CHANGELOG.md)
+
 > **⚠️ For authorized use only.** Use Dribik exclusively on systems you own or have **explicit written permission** to assess.
 
 Dribik is a Python CLI toolkit for structured, consent-tracked web penetration testing. It gives you an asset graph, scope enforcement, active vulnerability scanners, and professional report generation — all wired together in one workspace.
+
+---
+
+## Why Dribik
+
+Most command-line security tools solve one step of an assessment. Dribik keeps the assessment
+itself organized: scope is checked before network activity, written authorization is recorded per
+target and capability, every request is auditable, and discoveries flow into one deduplicated asset
+graph. The result is a small, transparent toolkit for authorized work—not an unattended attack
+framework.
+
+```text
+scope + written consent → recon / scans → asset graph + audit trail → reports / exports
+```
+
+## At a glance
+
+| Designed for | Not designed for |
+|---|---|
+| Authorized web assessments with a defined scope | Scanning targets without permission |
+| Reproducible CLI workflows and structured evidence | Exploit chains, credential harvesting, or C2 |
+| Local-first workspaces with JSON/Markdown/HTML/SARIF output | Sending assessment data to a hosted service |
 
 ---
 
@@ -191,6 +218,21 @@ pytest tests/ -v
 ```
 
 The test suite covers: scope, consent, graph, scoring (CVSS), reports (Markdown/HTML/JSON/SARIF), CLI (including consent gate enforcement), collection export, recon, and all vuln modules (XSS, SQLi, LFI, headers, JWT, open redirect) using mocks plus a small loopback integration fixture — no network required.
+
+The GitHub Actions workflow runs Ruff, strict mypy, and the full test suite with a **70% minimum
+coverage gate** on Python 3.11 and 3.12.
+
+---
+
+## Project resources
+
+| Resource | Description |
+|---|---|
+| [Architecture](docs/architecture.md) | Workspace model, safety boundaries, and data flow |
+| [Examples](examples/README.md) | Synthetic, safe-to-run workspace examples |
+| [Contributing](CONTRIBUTING.md) | Development setup and contribution boundaries |
+| [Security policy](SECURITY.md) | How to report a vulnerability in Dribik |
+| [Changelog](CHANGELOG.md) | Release notes and compatibility notes |
 
 ---
 

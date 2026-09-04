@@ -2,6 +2,14 @@
 
 ## 0.1.0-beta — 2026-09-04
 
+### Added
+
+- Raw HTTP request replay from proxy exports, protected by the normal scope, consent,
+  rate-limit, and audit controls.
+- Authorized common-path content discovery with soft-404 filtering.
+- SARIF report export for code-scanning integrations.
+- A 70% coverage gate in CI, dependency-update automation, and polished GitHub project docs.
+
 ### Fixed & Quality Hardening
 
 - Removed dead duplicate `_inject_get` definition in `src/dribik/vulns/sqli.py`.

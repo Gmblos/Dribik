@@ -1,6 +1,6 @@
-# Architecture — Skillet 0.0.1-beta
+# Architecture — Dribik 0.1.0-beta
 
-This document describes **what exists in beta** and **what is specified but not shipped**. It is not an attack playbook.
+This document describes the data model and safety boundaries of Dribik. It is not an attack playbook.
 
 ## 1. Unified data layer
 
@@ -27,31 +27,24 @@ All assets live in one graph (`workspace/graph.json`).
 - param: parent endpoint id + location + name  
 - js_route: source URL + path
 
-## 2. Adaptive recon engine (policy only)
+## 2. Recon and discovery
 
-Beta ships a **planner**, not an enumerator.
+Dribik combines passive discovery with authorized active discovery.
 
-1. **Passive-first:** treat imported hosts as coming from API/passive sources the operator already ran under authorization.  
-2. **Escalate only as a review item:** hosts with no `ips` and `alive != true` are listed as `needs_operator_review`. Skillet does not brute-force labels.  
-3. **Wildcard risk:** if the operator marks a domain `wildcard_risk: true` (or imports that flag), HTTP liveness from catch-all DNS should not be treated as a distinct live host. Detection of wildcards is left to the operator’s DNS tooling; Skillet stores the flag so reports and collections can de-weight those hosts.
+1. **Passive-first:** certificate-transparency lookup and graph planning avoid direct target contact.
+2. **Authorized discovery:** robots/sitemaps, crawler, content discovery, and subdomain enumeration require matching scope and consent before they send traffic.
+3. **Wildcard risk:** if the operator marks a domain `wildcard_risk: true` (or imports that flag), HTTP liveness from catch-all DNS should not be treated as a distinct live host. Detection of wildcards is left to the operator’s DNS tooling; Dribik stores the flag so reports and collections can de-weight those hosts.
 
-Future versions may add *read-only* adapters (certificate transparency, program-provided asset APIs) behind the same consent and scope gates. They will not add wordlist brute-force.
+Dribik deliberately avoids high-rate fuzzing, exploit chaining, credential harvesting, and C2
+integration. `recon tokens` emits unique path segments and parameter names already observed; it is
+inventory, not a fuzzing engine.
 
-## 3. Smart fuzzing layer (not shipped)
+## 3. Scan engine and confidence scoring
 
-Specified for later discussion, **absent from 0.0.1-beta**:
-
-- High-rate HTTP fuzzing  
-- Auto-hitting generated paths  
-- WAF/rate-limit backoff loops against live targets  
-
-**Shipped instead:** `recon tokens` walks the graph and emits unique path segments and parameter names already observed. That is inventory, not a fuzzer.
-
-## 4. Scan engine and confidence scoring
-
-**Not shipped:** template runners, injection testers, exploitation depth, or payload libraries.
-
-**Shipped:** findings are records the operator imports after validation. Each finding may include:
+The scan commands cover common, bounded checks (security headers, reflected XSS, SQLi, SSRF, LFI,
+open redirect, JWT audit, and technology fingerprinting). They all pass through the same scope,
+consent, rate-limit, and audit mechanisms. Findings can also be imported after manual validation.
+Each finding may include:
 
 - `template_age_days` — older templates score lower (staleness / unmaintained signatures)  
 - `response_diff_agreement` — 0.0–1.0, how strongly a baseline vs. candidate response difference supports the claim (operator-supplied; Skillet does not probe)  
@@ -65,15 +58,15 @@ Score in `[0, 1]`:
 
 where `freshness = max(0, 1 - template_age_days / 365)`.
 
-Active exploitation, if ever considered, would be a separate plugin with **per-target consent** (`capability: active_exploitation`). That plugin is not in this repository.
+## 4. Human-in-the-loop
 
-## 5. Human-in-the-loop
-
-Beta stores `notes` on endpoints (repeater-style **documentation**: method, URL, headers the operator already used). It does not send traffic and does not mutate payloads across a grid of positions.
+Dribik stores `notes` on endpoints (repeater-style **documentation**: method, URL, headers the
+operator already used). Raw HTTP requests copied from an intercepting proxy can be replayed only
+after scope and consent checks; transport-sensitive headers are stripped or rebuilt safely.
 
 Consent file (`consent.json`) lists `{target, capability, operator, granted_at, expires_at}`. Report and collection writers require scope match; they do not require consent because they do not touch the target. Any future network client must call `consent.require(...)`.
 
-## 6. Reporting
+## 5. Reporting
 
 **Markdown report:** program name, graph summary, findings sorted by confidence, explicit **Out of scope** section so ROE violations are visible.
 
@@ -83,7 +76,7 @@ Consent file (`consent.json`) lists `{target, capability, operator, granted_at, 
 
 ```
 workspace/
-  skillet.yaml      # program metadata + schema version
+  dribik.yaml       # program metadata + schema version
   graph.json
   scope.yaml
   consent.json
@@ -91,4 +84,4 @@ workspace/
   notes.json        # optional operator notes keyed by node id
 ```
 
-Schema version for 0.0.1-beta is `1`.
+Schema version for 0.1.0-beta is `1`.

@@ -23,4 +23,4 @@ jobs:
       - name: Type check
         run: mypy src
       - name: Test
-        run: pytest -q --cov=dribik
+        run: pytest -q --cov=dribik --cov-fail-under=70

@@ -15,6 +15,7 @@ from dribik.vulns.jwt_audit import _b64url_encode, _decode_jwt, audit_jwt
 from dribik.vulns.lfi import scan_lfi
 from dribik.vulns.open_redirect import scan_open_redirect
 from dribik.vulns.sqli import scan_sqli
+from dribik.vulns.ssrf import scan_ssrf
 from dribik.vulns.xss import scan_xss
 
 # ---------------------------------------------------------------------------
@@ -248,3 +249,85 @@ def test_security_headers_library_respects_scope():
     assert actual_checks == []
     assert actual_findings == []
     request.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# SSRF — mock cloud metadata and internal service probes
+# ---------------------------------------------------------------------------
+
+
+def test_ssrf_aws_metadata_detected():
+    aws_body = "ami-id: ami-0123456789abcdef0\ninstance-id: i-1234567890abcdef0"
+    with mock.patch("dribik.vulns.ssrf.http_get", return_value=_mock_result(aws_body)):
+        findings = scan_ssrf(
+            "http://x.test/proxy?url=http://example.com",
+            params=["url"],
+            payloads=["http://169.254.169.254/latest/meta-data/"],
+            test_post=False,
+        )
+    assert len(findings) == 1
+    assert findings[0].vuln_type == "SSRF"
+    assert findings[0].severity == "critical"
+    assert findings[0].cwe_id == "CWE-918"
+
+
+def test_ssrf_gcp_metadata_detected():
+    gcp_body = '{"instance": {"zone": "projects/123/zones/us-central1-a"}, "computeMetadata": true}'
+    with mock.patch("dribik.vulns.ssrf.http_get", return_value=_mock_result(gcp_body)):
+        findings = scan_ssrf(
+            "http://x.test/fetch?dest=http://example.com",
+            params=["dest"],
+            payloads=["http://metadata.google.internal/computeMetadata/v1/"],
+            test_post=False,
+        )
+    assert len(findings) == 1
+    assert findings[0].vuln_type == "SSRF"
+
+
+def test_ssrf_redis_reflection_detected():
+    redis_body = "-ERR unknown command 'GET'\r\n"
+    with mock.patch("dribik.vulns.ssrf.http_get", return_value=_mock_result(redis_body)):
+        findings = scan_ssrf(
+            "http://x.test/view?site=http://example.com",
+            params=["site"],
+            payloads=["http://localhost:6379/"],
+            test_post=False,
+        )
+    assert len(findings) == 1
+    assert "SSRF" in findings[0].title
+
+
+def test_ssrf_clean_response_no_finding():
+    clean_body = "<html><body>Welcome to safe site</body></html>"
+    with mock.patch("dribik.vulns.ssrf.http_get", return_value=_mock_result(clean_body)), \
+         mock.patch("dribik.vulns.ssrf.http_post", return_value=_mock_result(clean_body)):
+        findings = scan_ssrf(
+            "http://x.test/proxy?url=http://example.com",
+            params=["url"],
+            payloads=["http://169.254.169.254/latest/meta-data/"],
+            test_post=True,
+        )
+    assert findings == []
+
+
+def test_ssrf_post_probe_detected():
+    clean_get = _mock_result("<html>normal</html>")
+    passwd_post = _mock_result("root:x:0:0:root:/root:/bin/bash")
+    with mock.patch("dribik.vulns.ssrf.http_get", return_value=clean_get), \
+         mock.patch("dribik.vulns.ssrf.http_post", return_value=passwd_post):
+        findings = scan_ssrf(
+            "http://x.test/api/fetch",
+            params=["target"],
+            payloads=["file:///etc/passwd"],
+            test_post=True,
+        )
+    assert len(findings) == 1
+    assert "POST body" in findings[0].title
+
+
+def test_ssrf_respects_scope():
+    scope = Scope(allow=[ScopeRule(kind="domain_suffix", value="authorized.test")])
+    with mock.patch("dribik.vulns.ssrf.http_get") as mock_get:
+        findings = scan_ssrf("https://unauthorized.test/api", scope=scope)
+    assert findings == []
+    mock_get.assert_not_called()

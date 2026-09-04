@@ -23,6 +23,15 @@ def test_cli_init_and_status(tmp_path: Path):
     assert '"total": 0' in result.output
 
 
+def test_cli_doctor_reports_healthy_workspace(tmp_path: Path):
+    runner = CliRunner()
+    ws = tmp_path / "doctor"
+    runner.invoke(main, ["init", str(ws), "--program", "Demo"])
+    result = runner.invoke(main, ["doctor", str(ws)])
+    assert result.exit_code == 0, result.output
+    assert '"dribik.yaml": "ok"' in result.output
+
+
 def test_cli_scope_check(tmp_path: Path):
     runner = CliRunner()
     ws = tmp_path / "ws2"

@@ -8,9 +8,9 @@ from __future__ import annotations
 import json
 from unittest import mock
 
-from dribik.models import ScanResult
-from dribik.scanner import http_get
-from dribik.vulns.headers import evaluate_from_result
+from dribik.models import ScanResult, Scope, ScopeRule
+from dribik.scanner import http_get, http_post
+from dribik.vulns.headers import check_security_headers, evaluate_from_result
 from dribik.vulns.jwt_audit import _b64url_encode, _decode_jwt, audit_jwt
 from dribik.vulns.lfi import scan_lfi
 from dribik.vulns.open_redirect import scan_open_redirect
@@ -229,3 +229,22 @@ def test_http_get_preserves_redirect_when_requested(monkeypatch):
     result = http_get("https://example.test/redirect", follow_redirects=False, max_retries=0)
     assert result.status == 302
     assert result.headers["location"] == "https://evil.com"
+
+
+def test_http_post_blocks_redirects_by_default(monkeypatch):
+    def fake_request(request, timeout, *, follow_redirects):
+        assert follow_redirects is False
+        return 200, {}, b"ok", request.full_url
+
+    monkeypatch.setattr("dribik.scanner._do_request", fake_request)
+    result = http_post("https://example.test/form", data={"q": "safe"}, max_retries=0)
+    assert result.status == 200
+
+
+def test_security_headers_library_respects_scope():
+    scope = Scope(allow=[ScopeRule(kind="domain_suffix", value="example.test")])
+    with mock.patch("dribik.vulns.headers.http_get") as request:
+        actual_checks, actual_findings = check_security_headers("https://other.test/", scope=scope)
+    assert actual_checks == []
+    assert actual_findings == []
+    request.assert_not_called()

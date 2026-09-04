@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-beta — 2026-09-04
+
+### Changed
+
+- Active HTTP requests no longer follow redirects by default, preventing scope drift.
+- Robots, sitemap, and takeover checks now use the audited HTTP client.
+- Scope controls now apply in reusable scanner APIs as well as the CLI.
+- Added `dribik doctor` for non-mutating workspace health validation.
+
 ## 0.0.2-beta — 2026-09-04
 
 ### Added

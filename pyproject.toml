@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dribik"
-version = "0.0.2b0"
+version = "0.1.0b0"
 description = "Dribik — authorized web pentesting workspace: crawl, scan, report."
 readme = "README.md"
 license = { text = "Apache-2.0" }

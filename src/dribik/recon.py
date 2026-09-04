@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import re
-import urllib.error
 import urllib.request
 from xml.etree import ElementTree
 
 from dribik.models import Graph
+from dribik.scanner import http_get
+from dribik.scope import classify
 
 # ---------------------------------------------------------------------------
 # Existing passive helpers
@@ -66,7 +67,7 @@ def recon_plan(graph: Graph) -> dict:
         "wildcard_risk_hosts": sorted(wildcard),
         "notes": (
             "Unresolved hosts are listed for human review. "
-            "Dribik 0.0.2-beta does not brute-force DNS labels or probe HTTP without consent."
+            "Dribik 0.1.0-beta does not brute-force DNS labels or probe HTTP without consent."
         ),
     }
 
@@ -83,7 +84,7 @@ def passive_dns_crtsh(domain: str, timeout: int = 10) -> list[str]:
     url = f"https://crt.sh/?q=%.{domain}&output=json"
     subdomains: set[str] = set()
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "dribik/0.0.2-beta"})
+        req = urllib.request.Request(url, headers={"User-Agent": "dribik/0.1.0-beta"})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         for entry in data:
@@ -112,40 +113,40 @@ def fetch_robots(base_url: str, timeout: int = 10) -> dict:
     base_url = base_url.rstrip("/")
     robots_url = f"{base_url}/robots.txt"
     result: dict = {"sitemap_urls": [], "disallowed_paths": [], "raw": ""}
-    try:
-        req = urllib.request.Request(robots_url, headers={"User-Agent": "dribik/0.0.2-beta"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-        result["raw"] = raw
-        result["sitemap_urls"] = _SITEMAP_RE.findall(raw)
-        result["disallowed_paths"] = [
-            p for p in _DISALLOW_RE.findall(raw) if p and p != "/"
-        ]
-    except Exception:
-        pass
+    response = http_get(robots_url, timeout=timeout)
+    if response.error or not response.status or response.status >= 400:
+        return result
+    raw = response.body
+    result["raw"] = raw
+    result["sitemap_urls"] = _SITEMAP_RE.findall(raw)
+    result["disallowed_paths"] = [p for p in _DISALLOW_RE.findall(raw) if p and p != "/"]
     return result
 
 
-def fetch_sitemap(sitemap_url: str, timeout: int = 10) -> list[str]:
+def fetch_sitemap(sitemap_url: str, timeout: int = 10, scope=None) -> list[str]:
     """
     Fetch and parse a sitemap XML, returning all <loc> URLs found.
     Follows sitemap index files one level deep.
     """
+    if scope and classify(scope, sitemap_url) != "allow":
+        return []
     urls: list[str] = []
+    response = http_get(sitemap_url, timeout=timeout)
+    if response.error or not response.status or response.status >= 400:
+        return urls
     try:
-        req = urllib.request.Request(sitemap_url, headers={"User-Agent": "dribik/0.0.2-beta"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read()
-        root = ElementTree.fromstring(raw)
-        ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-        # Sitemap index
-        for loc in root.findall(".//sm:sitemap/sm:loc", ns):
-            child_urls = fetch_sitemap(loc.text or "", timeout=timeout)
-            urls.extend(child_urls)
-        # Regular sitemap
-        for loc in root.findall(".//sm:url/sm:loc", ns):
-            if loc.text:
-                urls.append(loc.text.strip())
-    except Exception:
-        pass
+        root = ElementTree.fromstring(response.body)
+    except ElementTree.ParseError:
+        return urls
+    ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    # Sitemap index
+    for loc in root.findall(".//sm:sitemap/sm:loc", ns):
+        child_urls = fetch_sitemap(loc.text or "", timeout=timeout, scope=scope)
+        urls.extend(child_urls)
+    # Regular sitemap
+    for loc in root.findall(".//sm:url/sm:loc", ns):
+        if loc.text:
+            candidate = loc.text.strip()
+            if not scope or classify(scope, candidate) == "allow":
+                urls.append(candidate)
     return urls

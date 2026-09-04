@@ -88,6 +88,7 @@ dribik collection write ./my-engagement --out ./acme.postman_collection.json
 | Command | Purpose |
 |---|---|
 | `dribik init <path> --program <name>` | Create workspace |
+| `dribik doctor <ws>` | Validate workspace files and report malformed records |
 | `dribik scope load <ws> --file <yaml>` | Load scope/ROE rules |
 | `dribik scope check <ws> <asset>` | Classify asset (allow/deny/unknown) |
 | `dribik consent grant <ws> --target <h> --capability <c> --operator <o>` | Record consent |
@@ -141,7 +142,7 @@ dribik collection write ./my-engagement --out ./acme.postman_collection.json
 
 ## Consent model
 
-Every command that contacts a target (`scan`, `subdomains`, and `recon robots`) requires both an allowed scope rule and matching consent before it sends a request. Each request is appended to `audit.jsonl` in the workspace.
+Every command that contacts a target (`scan`, `subdomains`, and `recon robots`) requires both an allowed scope rule and matching consent before it sends a request. Each HTTP request is appended to `audit.jsonl` in the workspace.
 
 ```
 Error: No valid consent for capability 'active_exploitation' on target 'example.com'.
@@ -187,8 +188,8 @@ The test suite covers: scope, consent, graph, scoring (CVSS), reports (Markdown/
 
 ## Versioning
 
-**0.0.2-beta** (`0.0.2b0` on PyPI-style metadata).  
-Workspace format (`schema_version: 1`) is stable within the 0.0.x series.
+**0.1.0-beta** (`0.1.0b0` on PyPI-style metadata).
+Workspace format (`schema_version: 1`) remains stable across the 0.1.x series.
 
 ## Contributing
 

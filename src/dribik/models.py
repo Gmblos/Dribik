@@ -1,4 +1,4 @@
-"""Dribik data models — v0.0.2-beta."""
+"""Dribik data models — v0.1.0-beta."""
 
 from __future__ import annotations
 
@@ -307,4 +307,4 @@ class WorkspaceMeta(BaseModel):
     schema_version: int = 1
     program: str
     created_at: str = Field(default_factory=utc_now)
-    dribik_version: str = "0.0.2-beta"
+    dribik_version: str = "0.1.0-beta"

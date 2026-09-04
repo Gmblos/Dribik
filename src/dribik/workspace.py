@@ -53,6 +53,26 @@ class Workspace:
             yaml.safe_dump(meta.model_dump(), sort_keys=False), encoding="utf-8"
         )
 
+    def health_check(self) -> dict[str, str]:
+        """Validate every required workspace record without changing it."""
+        checks: dict[str, str] = {}
+        loaders = {
+            META: self.load_meta,
+            GRAPH: self.load_graph,
+            SCOPE: self.load_scope,
+            CONSENT: self.load_consent,
+            FINDINGS: self.load_findings,
+        }
+        for filename, load in loaders.items():
+            try:
+                load()
+                checks[filename] = "ok"
+            except Exception as exc:
+                checks[filename] = f"error: {exc}"
+        checks[NOTES] = "ok" if (self.root / NOTES).exists() else "missing"
+        checks[AUDIT] = "ok" if (self.root / AUDIT).exists() else "not created yet"
+        return checks
+
     # ------------------------------------------------------------------
     # Meta / graph / scope / consent / findings
     # ------------------------------------------------------------------

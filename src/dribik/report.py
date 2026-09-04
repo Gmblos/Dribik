@@ -138,7 +138,7 @@ def write_report(
         "",
         "This report is generated from operator-imported inventory and active scan results. "
         "All active scanning was performed under explicit written authorization as recorded in the consent log. "
-        "Dribik 0.0.2-beta.",
+        "Dribik 0.1.0-beta.",
         "",
     ])
     return "\n".join(lines)
@@ -327,7 +327,7 @@ def write_html_report(
   <hr>
   <p style="color:#999;font-size:0.85em;">
     All active scanning was performed under explicit written authorization.
-    Dribik 0.0.2-beta — for authorized use only.
+    Dribik 0.1.0-beta — for authorized use only.
   </p>
 </body>
 </html>"""

@@ -17,7 +17,7 @@ from dribik.models import AuditEntry, ScanResult, Scope, TechStack
 from dribik.scope import classify
 
 _BODY_READ_LIMIT = 65536   # 64 KB — full body for matching
-_DEFAULT_UA = "dribik/0.0.2-beta (authorized assessment)"
+_DEFAULT_UA = "dribik/0.1.0-beta (authorized assessment)"
 _DEFAULT_TIMEOUT = 10
 
 
@@ -99,7 +99,7 @@ def _do_request(
     req: urllib.request.Request,
     timeout: int,
     *,
-    follow_redirects: bool = True,
+    follow_redirects: bool = False,
 ) -> tuple[int, dict[str, str], bytes, str]:
     """Execute a request through the opener. Returns (status, headers, body, final_url)."""
     opener = _build_opener(follow_redirects=follow_redirects)
@@ -129,6 +129,8 @@ def http_get(
     - Sends an AuditEntry to the global audit callback if registered.
     - Uses proxy if configured via set_proxy().
     - Reads up to 64 KB of response body.
+    - Does not follow redirects by default, preventing an in-scope request
+      from silently reaching an out-of-scope host.
     """
     request_headers = {"User-Agent": _DEFAULT_UA}
     if headers:
@@ -192,12 +194,13 @@ def http_post(
     headers: dict[str, str] | None = None,
     json_body: bool = False,
     timeout: int = _DEFAULT_TIMEOUT,
+    follow_redirects: bool = False,
     max_retries: int = 2,
 ) -> ScanResult:
     """
     Perform a POST request.
     Supports form-encoded, raw bytes, and JSON body (json_body=True).
-    Rate-limited, retried, proxy-aware, audit-logged.
+    Rate-limited, retried, proxy-aware, audit-logged, and redirect-safe by default.
     """
     import json as _json
     request_headers = {"User-Agent": _DEFAULT_UA}
@@ -226,7 +229,7 @@ def http_post(
         start = time.monotonic()
         try:
             req = urllib.request.Request(url, data=encoded, headers=request_headers, method="POST")
-            status, hdrs, raw, _ = _do_request(req, timeout)
+            status, hdrs, raw, _ = _do_request(req, timeout, follow_redirects=follow_redirects)
             elapsed = (time.monotonic() - start) * 1000
             body_text = raw.decode("utf-8", errors="replace")
             result = ScanResult(

@@ -6,6 +6,10 @@ import socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from dribik.models import Scope
+from dribik.scanner import http_get
+from dribik.scope import classify
+
 # Dangling CNAME fingerprints for common services
 _TAKEOVER_FINGERPRINTS: dict[str, list[str]] = {
     "GitHub Pages": ["there isn't a github pages site here", "for root domain"],
@@ -44,6 +48,7 @@ def enumerate_subdomains(
     domain: str,
     wordlist: list[str] | None = None,
     max_workers: int = 50,
+    scope: Scope | None = None,
 ) -> list[dict]:
     """
     DNS brute-force subdomain enumeration.
@@ -56,6 +61,8 @@ def enumerate_subdomains(
     Returns:
         List of dicts: {"fqdn": str, "ips": list[str], "alive": bool}
     """
+    if scope and classify(scope, domain) != "allow":
+        return []
     if wordlist is None:
         wordlist = _load_wordlist("subdomains.txt")
 
@@ -72,7 +79,7 @@ def enumerate_subdomains(
     return sorted(results, key=lambda r: r["fqdn"])
 
 
-def check_subdomain_takeover(fqdn: str, timeout: int = 8) -> dict:
+def check_subdomain_takeover(fqdn: str, timeout: int = 8, scope: Scope | None = None) -> dict:
     """
     Check if a subdomain is potentially vulnerable to takeover.
 
@@ -82,14 +89,15 @@ def check_subdomain_takeover(fqdn: str, timeout: int = 8) -> dict:
     Returns:
         {"fqdn": str, "vulnerable": bool, "service": str, "note": str}
     """
-    import urllib.request
-
     result = {
         "fqdn": fqdn,
         "vulnerable": False,
         "service": "",
         "note": "",
     }
+    if scope and classify(scope, fqdn) != "allow":
+        result["note"] = "Out of scope"
+        return result
     _, ips = _resolve(fqdn)
     if not ips:
         result["note"] = "Does not resolve — possible dangling DNS record"
@@ -97,20 +105,17 @@ def check_subdomain_takeover(fqdn: str, timeout: int = 8) -> dict:
         return result
 
     for scheme in ("https", "http"):
-        try:
-            url = f"{scheme}://{fqdn}/"
-            req = urllib.request.Request(url, headers={"User-Agent": "dribik/0.0.2-beta"})
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                body = resp.read(4096).decode("utf-8", errors="replace").lower()
-            for service, markers in _TAKEOVER_FINGERPRINTS.items():
-                for marker in markers:
-                    if marker.lower() in body:
-                        result["vulnerable"] = True
-                        result["service"] = service
-                        result["note"] = f"Matched takeover fingerprint for {service}"
-                        return result
-            break
-        except Exception:
+        response = http_get(f"{scheme}://{fqdn}/", timeout=timeout)
+        if response.error:
             continue
+        body = response.body[:4096].lower()
+        for service, markers in _TAKEOVER_FINGERPRINTS.items():
+            for marker in markers:
+                if marker.lower() in body:
+                    result["vulnerable"] = True
+                    result["service"] = service
+                    result["note"] = f"Matched takeover fingerprint for {service}"
+                    return result
+        break
 
     return result

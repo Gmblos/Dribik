@@ -36,7 +36,7 @@ _ALL_CAPABILITIES = list(get_args(Capability))
               help="HTTP/HTTPS proxy URL, e.g. http://127.0.0.1:8080 (Burp/ZAP).", type=str)
 @click.pass_context
 def main(ctx: click.Context, rate: float, proxy: str | None) -> None:
-    """Dribik — authorized web pentesting workspace (0.0.2-beta)."""
+    """Dribik — authorized web pentesting workspace (0.1.0-beta)."""
     from dribik.scanner import set_proxy, set_rate_limit
     set_rate_limit(rate)
     if proxy:
@@ -57,6 +57,17 @@ def init_cmd(path: Path, program: str) -> None:
     ws = Workspace(path)
     ws.create(program)
     click.echo(f"✓ Initialized Dribik workspace at {path.resolve()}")
+
+
+@main.command("doctor")
+@click.argument("workspace", type=click.Path(path_type=Path, exists=True, file_okay=False))
+def doctor_cmd(workspace: Path) -> None:
+    """Validate the workspace files and report any malformed records."""
+    checks = Workspace(workspace).health_check()
+    click.echo(json.dumps(checks, indent=2))
+    failures = [name for name, status in checks.items() if status.startswith("error") or status == "missing"]
+    if failures:
+        raise click.ClickException(f"Workspace health check failed: {', '.join(failures)}")
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +227,8 @@ def recon_passive_dns(workspace: Path, domain: str, import_graph: bool) -> None:
 def recon_robots_cmd(workspace: Path, url: str, import_graph: bool) -> None:
     """Fetch and parse robots.txt and sitemap.xml."""
     _require_authorized_target(workspace, url)
+    ws = Workspace(workspace)
+    scope_obj = ws.load_scope()
     click.echo(f"Fetching {url}/robots.txt …")
     robots = fetch_robots(url)
     click.echo(f"  Disallowed paths: {len(robots['disallowed_paths'])}")
@@ -225,11 +238,10 @@ def recon_robots_cmd(workspace: Path, url: str, import_graph: bool) -> None:
     all_sitemap_urls: list[str] = []
     for sm_url in robots["sitemap_urls"]:
         click.echo(f"  Fetching sitemap: {sm_url} …")
-        sitemap_urls = fetch_sitemap(sm_url)
+        sitemap_urls = fetch_sitemap(sm_url, scope=scope_obj)
         all_sitemap_urls.extend(sitemap_urls)
         click.echo(f"    Found {len(sitemap_urls)} URL(s)")
     if import_graph and all_sitemap_urls:
-        ws = Workspace(workspace)
         g = ws.load_graph()
         for su in all_sitemap_urls:
             add_endpoint(g, "GET", su, "sitemap")
@@ -408,7 +420,8 @@ def scan_headers(workspace: Path, url: str, save: bool) -> None:
     _require_authorized_target(workspace, url, "active_exploitation:headers")
     from dribik.vulns.headers import check_security_headers
     click.echo(f"Checking security headers: {url} …")
-    checks, new_findings = check_security_headers(url)
+    ws = Workspace(workspace)
+    checks, new_findings = check_security_headers(url, scope=ws.load_scope())
     for check in checks:
         icon = "✓" if check.present else "✗"
         color = "green" if check.present else ("red" if check.severity in ("high", "critical") else "yellow")
@@ -416,7 +429,6 @@ def scan_headers(workspace: Path, url: str, save: bool) -> None:
         if check.note:
             click.echo(f"      → {check.note}")
     if new_findings and save:
-        ws = Workspace(workspace)
         bundle = ws.load_findings()
         existing_ids = {f.id for f in bundle.findings}
         added = [f for f in new_findings if f.id not in existing_ids]
@@ -431,7 +443,7 @@ def scan_headers(workspace: Path, url: str, save: bool) -> None:
 @click.option("--params", default="", help="Comma-separated parameter names (optional)")
 @click.option("--no-post", is_flag=True, default=False, help="Skip POST body injection")
 @click.option("--save", is_flag=True, default=False, help="Save findings to workspace")
-@click.option("--audit", is_flag=True, default=False, help="Log all requests to audit.jsonl")
+@click.option("--audit", is_flag=True, default=False, help="Deprecated: request auditing is always enabled")
 def scan_xss(workspace: Path, url: str, params: str, no_post: bool, save: bool, audit: bool) -> None:
     """Probe URL parameters (GET + POST) for reflected XSS."""
     _require_authorized_target(workspace, url, "active_exploitation:xss")
@@ -462,7 +474,7 @@ def scan_xss(workspace: Path, url: str, params: str, no_post: bool, save: bool, 
 @click.option("--params", default="", help="Comma-separated parameter names (optional)")
 @click.option("--no-post", is_flag=True, default=False, help="Skip POST body injection")
 @click.option("--save", is_flag=True, default=False, help="Save findings to workspace")
-@click.option("--audit", is_flag=True, default=False, help="Log all requests to audit.jsonl")
+@click.option("--audit", is_flag=True, default=False, help="Deprecated: request auditing is always enabled")
 def scan_sqli(workspace: Path, url: str, params: str, no_post: bool, save: bool, audit: bool) -> None:
     """Probe URL parameters (GET + POST) for SQL Injection (error-based + time-based)."""
     _require_authorized_target(workspace, url, "active_exploitation:sqli")
@@ -498,14 +510,14 @@ def scan_ssrf(workspace: Path, url: str, params: str, save: bool) -> None:
     from dribik.vulns.ssrf import scan_ssrf as _scan
     param_list = [p.strip() for p in params.split(",") if p.strip()] or None
     click.echo(f"Scanning SSRF: {url} …")
-    new_findings = _scan(url, params=param_list, asset_id=url)
+    ws = Workspace(workspace)
+    new_findings = _scan(url, params=param_list, asset_id=url, scope=ws.load_scope())
     if not new_findings:
         click.echo("  No SSRF found.")
         return
     for f in new_findings:
         click.echo(click.style(f"  [FOUND] {f.title}", fg="red", bold=True))
     if save:
-        ws = Workspace(workspace)
         bundle = ws.load_findings()
         existing_ids = {f.id for f in bundle.findings}
         added = [f for f in new_findings if f.id not in existing_ids]
@@ -525,14 +537,14 @@ def scan_lfi(workspace: Path, url: str, params: str, save: bool) -> None:
     from dribik.vulns.lfi import scan_lfi as _scan
     param_list = [p.strip() for p in params.split(",") if p.strip()] or None
     click.echo(f"Scanning LFI: {url} …")
-    new_findings = _scan(url, params=param_list, asset_id=url)
+    ws = Workspace(workspace)
+    new_findings = _scan(url, params=param_list, asset_id=url, scope=ws.load_scope())
     if not new_findings:
         click.echo("  No LFI found.")
         return
     for f in new_findings:
         click.echo(click.style(f"  [FOUND] {f.title}", fg="red", bold=True))
     if save:
-        ws = Workspace(workspace)
         bundle = ws.load_findings()
         existing_ids = {f.id for f in bundle.findings}
         added = [f for f in new_findings if f.id not in existing_ids]
@@ -577,14 +589,14 @@ def scan_redirect(workspace: Path, url: str, params: str, save: bool) -> None:
     from dribik.vulns.open_redirect import scan_open_redirect
     param_list = [p.strip() for p in params.split(",") if p.strip()] or None
     click.echo(f"Scanning open redirects: {url} …")
-    new_findings = scan_open_redirect(url, params=param_list, asset_id=url)
+    ws = Workspace(workspace)
+    new_findings = scan_open_redirect(url, params=param_list, asset_id=url, scope=ws.load_scope())
     if not new_findings:
         click.echo("  No open redirects found.")
         return
     for f in new_findings:
         click.echo(click.style(f"  [FOUND] {f.title}", fg="yellow", bold=True))
     if save:
-        ws = Workspace(workspace)
         bundle = ws.load_findings()
         existing_ids = {f.id for f in bundle.findings}
         added = [f for f in new_findings if f.id not in existing_ids]
@@ -615,7 +627,8 @@ def subdomains_enum(workspace: Path, domain: str, wordlist: Path | None, workers
     if wordlist:
         wl = [ln.strip() for ln in wordlist.read_text(encoding="utf-8").splitlines() if ln.strip()]
     click.echo(f"Enumerating subdomains of {domain} …")
-    results = enumerate_subdomains(domain, wordlist=wl, max_workers=workers)
+    ws = Workspace(workspace)
+    results = enumerate_subdomains(domain, wordlist=wl, max_workers=workers, scope=ws.load_scope())
     if not results:
         click.echo("  No subdomains resolved.")
         return
@@ -623,7 +636,6 @@ def subdomains_enum(workspace: Path, domain: str, wordlist: Path | None, workers
     for r in results:
         click.echo(f"    {r['fqdn']}  →  {', '.join(r['ips'])}")
     if import_graph:
-        ws = Workspace(workspace)
         g = ws.load_graph()
         for r in results:
             add_host(g, r["fqdn"], "dribik-dns", domain=domain, ips=r["ips"], alive=r["alive"])
@@ -641,7 +653,8 @@ def subdomains_takeover(workspace: Path, fqdn: str, save: bool) -> None:
     from dribik.models import CVSSVector, Finding
     from dribik.subdomains import check_subdomain_takeover
     click.echo(f"Checking takeover risk for {fqdn} …")
-    result = check_subdomain_takeover(fqdn)
+    ws = Workspace(workspace)
+    result = check_subdomain_takeover(fqdn, scope=ws.load_scope())
     if result["vulnerable"]:
         click.echo(click.style(
             f"  [VULNERABLE] {fqdn} — {result['service'] or 'dangling DNS'}",
@@ -649,7 +662,6 @@ def subdomains_takeover(workspace: Path, fqdn: str, save: bool) -> None:
         ))
         click.echo(f"  Note: {result['note']}")
         if save:
-            ws = Workspace(workspace)
             bundle = ws.load_findings()
             f = Finding(
                 id=f"TAKEOVER-{fqdn.replace('.', '-').upper()[:20]}",

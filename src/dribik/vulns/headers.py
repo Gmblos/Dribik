@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import uuid
 
-from dribik.models import CVSSVector, Finding, HeaderCheckResult, Severity
+from dribik.models import CVSSVector, Finding, HeaderCheckResult, Scope, Severity
 from dribik.scanner import ScanResult, http_get
+from dribik.scope import classify
 
 # Header policy definitions: (header_name, severity_if_missing, note)
 _REQUIRED_HEADERS: list[tuple[str, Severity, str]] = [
@@ -50,6 +51,7 @@ def check_security_headers(
     *,
     timeout: int = 10,
     asset_id: str = "",
+    scope: Scope | None = None,
 ) -> tuple[list[HeaderCheckResult], list[Finding]]:
     """
     Fetch *url* and evaluate its HTTP security headers.
@@ -59,6 +61,8 @@ def check_security_headers(
         - header_results: raw check-by-check results
         - findings: Finding objects for exploitable issues
     """
+    if scope and classify(scope, url) != "allow":
+        return [], []
     result = http_get(url, timeout=timeout)
     if result.error:
         return [], []

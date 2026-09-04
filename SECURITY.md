@@ -4,7 +4,7 @@
 
 | Version | Support |
 | --- | --- |
-| 0.0.2-beta | Active |
+| 0.1.0-beta | Active |
 
 ## Using Dribik
 

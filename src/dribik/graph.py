@@ -1,6 +1,6 @@
-"""Graph management — asset node merging and bundle import."""
-
 from __future__ import annotations
+
+from typing import Any
 
 from dribik.models import (
     Graph,
@@ -31,10 +31,10 @@ def _merge_node(graph: Graph, node: Node) -> Node:
             existing.data[key] = value
     seen = {(s.tool, s.imported_at) for s in existing.sources}
     for source in node.sources:
-        key = (source.tool, source.imported_at)
-        if key not in seen:
+        source_key = (source.tool, source.imported_at)
+        if source_key not in seen:
             existing.sources.append(source)
-            seen.add(key)
+            seen.add(source_key)
     return existing
 
 
@@ -128,7 +128,7 @@ def add_js_route(graph: Graph, source_url: str, path: str, tool: str) -> Node:
     return _merge_node(graph, node)
 
 
-def import_bundle(graph: Graph, payload: dict, tool: str | None = None) -> int:
+def import_bundle(graph: Graph, payload: dict[str, Any], tool: str | None = None) -> int:
     """Merge a JSON bundle: {tool?, hosts[], endpoints[], params[], js_routes[]}."""
     src = tool or payload.get("tool") or "import"
     before = len(graph.nodes)

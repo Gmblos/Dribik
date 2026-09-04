@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import BaseModel, Field, computed_field
@@ -113,7 +113,7 @@ class Node(BaseModel):
     id: str
     type: NodeType
     sources: list[Source] = Field(default_factory=list)
-    data: dict = Field(default_factory=dict)
+    data: dict[str, Any] = Field(default_factory=dict)
 
 
 class Edge(BaseModel):
@@ -172,7 +172,7 @@ class CVSSVector(BaseModel):
 
     vector_string: str = ""
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def base_score(self) -> float:
         return _compute_cvss_base(self.vector_string)

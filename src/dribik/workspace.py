@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import yaml
@@ -14,6 +15,8 @@ from dribik.models import (
     Scope,
     WorkspaceMeta,
 )
+
+logger = logging.getLogger(__name__)
 
 GRAPH    = "graph.json"
 SCOPE    = "scope.yaml"
@@ -127,8 +130,8 @@ class Workspace:
             if line:
                 try:
                     entries.append(AuditEntry.model_validate_json(line))
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Failed to parse audit line: %s", exc)
         return entries
 
     def enable_audit_logging(self) -> None:

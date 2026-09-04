@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from urllib.parse import urlsplit
 
 from dribik.models import Scope, ScopeRule
@@ -40,13 +41,13 @@ def in_scope(scope: Scope, asset: str) -> bool:
     return classify(scope, asset) == "allow"
 
 
-def asset_ref(node_data_type: str, data: dict) -> str:
+def asset_ref(node_data_type: str, data: dict[str, Any]) -> str:
     if node_data_type == "host":
-        return data.get("fqdn", "")
+        return str(data.get("fqdn") or "")
     if node_data_type == "endpoint":
-        return data.get("url", "")
+        return str(data.get("url") or "")
     if node_data_type == "domain":
-        return data.get("name", "")
+        return str(data.get("name") or "")
     if node_data_type == "js_route":
-        return data.get("source_url") or data.get("path", "")
-    return str(data.get("name", ""))
+        return str(data.get("source_url") or data.get("path") or "")
+    return str(data.get("name") or "")

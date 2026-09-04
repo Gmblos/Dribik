@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from dribik.models import Graph, Scope
 from dribik.scope import classify
 
 
-def to_postman(graph: Graph, scope: Scope, name: str) -> dict:
+def to_postman(graph: Graph, scope: Scope, name: str) -> dict[str, Any]:
     items = []
     skipped = 0
     for node in sorted(graph.nodes.values(), key=lambda n: n.id):

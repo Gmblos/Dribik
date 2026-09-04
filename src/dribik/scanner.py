@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 import threading
 import time
@@ -12,9 +13,23 @@ import urllib.request
 from collections import deque
 from collections.abc import Callable
 from html.parser import HTMLParser
+from typing import Any
 
 from dribik.models import AuditEntry, ScanResult, Scope, TechStack
 from dribik.scope import classify
+
+__all__ = [
+    "set_rate_limit",
+    "set_proxy",
+    "set_audit_callback",
+    "http_get",
+    "http_post",
+    "crawl",
+    "detect_tech_stack",
+    "ScanResult",
+]
+
+logger = logging.getLogger(__name__)
 
 _BODY_READ_LIMIT = 65536   # 64 KB — full body for matching
 _DEFAULT_UA = "dribik/0.1.0-beta (authorized assessment)"
@@ -83,7 +98,7 @@ class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
 
 
 def _build_opener(*, follow_redirects: bool = True) -> urllib.request.OpenerDirector:
-    handlers: list = []
+    handlers: list[urllib.request.BaseHandler] = []
     if _proxy_url:
         handlers.append(urllib.request.ProxyHandler({
             "http": _proxy_url,
@@ -189,7 +204,7 @@ def http_get(
 
 def http_post(
     url: str,
-    data: bytes | str | dict | None = None,
+    data: bytes | str | dict[str, Any] | None = None,
     *,
     headers: dict[str, str] | None = None,
     json_body: bool = False,
@@ -272,8 +287,8 @@ def _emit_audit(entry: AuditEntry) -> None:
     if _audit_callback:
         try:
             _audit_callback(entry)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Audit callback error: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -285,7 +300,7 @@ class _LinkParser(HTMLParser):
         self.base_url = base_url
         self.links: list[str] = []
 
-    def handle_starttag(self, tag: str, attrs: list) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attr_map = dict(attrs)
         href = None
         if tag == "a":
@@ -306,8 +321,8 @@ def _extract_links(base_url: str, html: str) -> list[str]:
     parser = _LinkParser(base_url)
     try:
         parser.feed(html)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Link parser error: %s", exc)
     return parser.links
 
 

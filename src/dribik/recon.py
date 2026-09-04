@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+import urllib.error
 import urllib.request
+from typing import Any
 from xml.etree import ElementTree
 
-from dribik.models import Graph
+from dribik.models import Graph, Scope
 from dribik.scanner import http_get
 from dribik.scope import classify
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Existing passive helpers
@@ -43,7 +48,7 @@ def extract_tokens(graph: Graph) -> list[str]:
     return sorted(tokens)
 
 
-def recon_plan(graph: Graph) -> dict:
+def recon_plan(graph: Graph) -> dict[str, Any]:
     """Passive-first plan: unresolved hosts need operator review (no brute-force)."""
     unresolved: list[str] = []
     wildcard: list[str] = []
@@ -93,8 +98,8 @@ def passive_dns_crtsh(domain: str, timeout: int = 10) -> list[str]:
                 line = line.strip().lstrip("*.")
                 if line.endswith(f".{domain}") or line == domain:
                     subdomains.add(line.lower())
-    except Exception:
-        pass
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
+        logger.debug("crt.sh query failed for %s: %s", domain, exc)
     return sorted(subdomains)
 
 
@@ -105,14 +110,14 @@ _SITEMAP_RE = re.compile(r"Sitemap:\s*(\S+)", re.IGNORECASE)
 _DISALLOW_RE = re.compile(r"Disallow:\s*(\S+)", re.IGNORECASE)
 
 
-def fetch_robots(base_url: str, timeout: int = 10) -> dict:
+def fetch_robots(base_url: str, timeout: int = 10) -> dict[str, Any]:
     """
     Fetch and parse robots.txt from *base_url*.
     Returns {"sitemap_urls": [...], "disallowed_paths": [...], "raw": "..."}.
     """
     base_url = base_url.rstrip("/")
     robots_url = f"{base_url}/robots.txt"
-    result: dict = {"sitemap_urls": [], "disallowed_paths": [], "raw": ""}
+    result: dict[str, Any] = {"sitemap_urls": [], "disallowed_paths": [], "raw": ""}
     response = http_get(robots_url, timeout=timeout)
     if response.error or not response.status or response.status >= 400:
         return result
@@ -123,7 +128,7 @@ def fetch_robots(base_url: str, timeout: int = 10) -> dict:
     return result
 
 
-def fetch_sitemap(sitemap_url: str, timeout: int = 10, scope=None) -> list[str]:
+def fetch_sitemap(sitemap_url: str, timeout: int = 10, scope: Scope | None = None) -> list[str]:
     """
     Fetch and parse a sitemap XML, returning all <loc> URLs found.
     Follows sitemap index files one level deep.

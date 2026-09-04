@@ -2,12 +2,14 @@
 
 ## 0.1.0-beta — 2026-09-04
 
-### Changed
+### Fixed & Quality Hardening
 
-- Active HTTP requests no longer follow redirects by default, preventing scope drift.
-- Robots, sitemap, and takeover checks now use the audited HTTP client.
-- Scope controls now apply in reusable scanner APIs as well as the CLI.
-- Added `dribik doctor` for non-mutating workspace health validation.
+- Removed dead duplicate `_inject_get` definition in `src/dribik/vulns/sqli.py`.
+- Replaced bare `except Exception: pass` in `recon.py` (crt.sh lookup) with explicit network/decoding error handling and debug logging.
+- Addressed silent exception swallowing across `scanner.py`, `workspace.py`, and `jwt_audit.py`.
+- Resolved all 32 strict type errors across `src/`, achieving 100% clean check under `mypy src --strict`.
+- Expanded Ruff ruleset to enforce `E`, `W`, `F`, `I`, `B` (flake8-bugbear), and `S110`/`S112` (try-except pass/continue).
+- Integrated `mypy src` and `pytest --cov=dribik` coverage reporting directly into GitHub Actions CI.
 
 ## 0.0.2-beta — 2026-09-04
 

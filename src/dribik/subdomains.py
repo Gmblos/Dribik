@@ -5,6 +5,7 @@ from __future__ import annotations
 import socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import Any
 
 from dribik.models import Scope
 from dribik.scanner import http_get
@@ -29,7 +30,7 @@ def _resolve(fqdn: str) -> tuple[str, list[str]]:
     """Resolve FQDN → list of IPs (empty = not resolved)."""
     try:
         infos = socket.getaddrinfo(fqdn, None)
-        ips = list({i[4][0] for i in infos})
+        ips = list({str(i[4][0]) for i in infos})
         return fqdn, ips
     except socket.gaierror:
         return fqdn, []
@@ -49,7 +50,7 @@ def enumerate_subdomains(
     wordlist: list[str] | None = None,
     max_workers: int = 50,
     scope: Scope | None = None,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """
     DNS brute-force subdomain enumeration.
 
@@ -67,7 +68,7 @@ def enumerate_subdomains(
         wordlist = _load_wordlist("subdomains.txt")
 
     candidates = [f"{prefix.strip()}.{domain}" for prefix in wordlist if prefix.strip()]
-    results: list[dict] = []
+    results: list[dict[str, Any]] = []
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {pool.submit(_resolve, fqdn): fqdn for fqdn in candidates}
@@ -79,7 +80,7 @@ def enumerate_subdomains(
     return sorted(results, key=lambda r: r["fqdn"])
 
 
-def check_subdomain_takeover(fqdn: str, timeout: int = 8, scope: Scope | None = None) -> dict:
+def check_subdomain_takeover(fqdn: str, timeout: int = 8, scope: Scope | None = None) -> dict[str, Any]:
     """
     Check if a subdomain is potentially vulnerable to takeover.
 
@@ -89,7 +90,7 @@ def check_subdomain_takeover(fqdn: str, timeout: int = 8, scope: Scope | None = 
     Returns:
         {"fqdn": str, "vulnerable": bool, "service": str, "note": str}
     """
-    result = {
+    result: dict[str, Any] = {
         "fqdn": fqdn,
         "vulnerable": False,
         "service": "",

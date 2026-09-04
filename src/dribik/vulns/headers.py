@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import uuid
 
-from dribik.models import CVSSVector, Finding, HeaderCheckResult, Scope, Severity
-from dribik.scanner import ScanResult, http_get
+from dribik.models import CVSSVector, Finding, HeaderCheckResult, ScanResult, Scope, Severity
+from dribik.scanner import http_get
 from dribik.scope import classify
 
 # Header policy definitions: (header_name, severity_if_missing, note)

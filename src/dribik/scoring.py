@@ -48,7 +48,7 @@ def apply_scores(findings: list[Finding]) -> list[Finding]:
     return findings
 
 
-def risk_matrix(findings: list[Finding]) -> dict:
+def risk_matrix(findings: list[Finding]) -> dict[str, dict[str, int]]:
     """Return severity × confidence count matrix."""
     matrix: dict[str, dict[str, int]] = {}
     for f in findings:

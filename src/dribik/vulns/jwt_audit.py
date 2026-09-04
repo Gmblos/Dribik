@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
 import json
 import uuid
 from pathlib import Path
+from typing import Any
 
 from dribik.models import CVSSVector, Finding
 
@@ -24,16 +26,16 @@ def _b64url_encode(b: bytes) -> str:
     return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
 
 
-def _decode_jwt(token: str) -> tuple[dict, dict, str] | None:
+def _decode_jwt(token: str) -> tuple[dict[str, Any], dict[str, Any], str] | None:
     """Split JWT into (header, payload, signature_b64)."""
     parts = token.strip().split(".")
     if len(parts) != 3:
         return None
     try:
-        header = json.loads(_b64url_decode(parts[0]))
-        payload = json.loads(_b64url_decode(parts[1]))
+        header: dict[str, Any] = json.loads(_b64url_decode(parts[0]))
+        payload: dict[str, Any] = json.loads(_b64url_decode(parts[1]))
         return header, payload, parts[2]
-    except Exception:
+    except (json.JSONDecodeError, binascii.Error, UnicodeDecodeError, ValueError):
         return None
 
 
@@ -55,15 +57,17 @@ _BUILTIN_SECRETS = [
 
 
 def _verify_hs256(token_parts: list[str], secret: str) -> bool:
-    """Verify HMAC-SHA256 signature."""
-    signing_input = f"{token_parts[0]}.{token_parts[1]}".encode()
-    expected = hmac.new(
-        secret.encode("utf-8"),
-        signing_input,
-        hashlib.sha256,
-    ).digest()
-    actual = _b64url_decode(token_parts[2])
-    return hmac.compare_digest(expected, actual)
+    try:
+        signing_input = f"{token_parts[0]}.{token_parts[1]}".encode("ascii")
+        expected = hmac.new(
+            secret.encode("utf-8"),
+            signing_input,
+            hashlib.sha256,
+        ).digest()
+        actual = _b64url_decode(token_parts[2])
+        return hmac.compare_digest(expected, actual)
+    except (ValueError, binascii.Error, UnicodeError):
+        return False
 
 
 def audit_jwt(
@@ -130,37 +134,34 @@ def audit_jwt(
     if alg == "hs256":
         wordlist = secrets or _load_wordlist()
         for secret in wordlist:
-            try:
-                if _verify_hs256(parts, secret):
-                    findings.append(
-                        Finding(
-                            id=f"JWT-{uuid.uuid4().hex[:8].upper()}",
-                            title="JWT: Weak HMAC secret discovered",
-                            severity="critical",
-                            vuln_type="JWT",
-                            asset_id=asset_id or "jwt-token",
-                            summary=(
-                                "The JWT HS256 secret is weak and was brute-forced. "
-                                "An attacker can forge arbitrary tokens."
-                            ),
-                            proof_of_concept=f"Secret found: `{secret}`",
-                            remediation=(
-                                "Replace the secret with a cryptographically random 256-bit key. "
-                                "Rotate all existing tokens immediately. "
-                                "Consider switching to RS256 (asymmetric) for better key management."
-                            ),
-                            references=[
-                                "https://portswigger.net/web-security/jwt",
-                                "https://owasp.org/Top10/A02_2021-Cryptographic_Failures/",
-                            ],
-                            cwe_id="CWE-321",
-                            cvss=CVSSVector(vector_string="AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"),
-                            response_diff_agreement=1.0,
-                        )
+            if _verify_hs256(parts, secret):
+                findings.append(
+                    Finding(
+                        id=f"JWT-{uuid.uuid4().hex[:8].upper()}",
+                        title="JWT: Weak HMAC secret discovered",
+                        severity="critical",
+                        vuln_type="JWT",
+                        asset_id=asset_id or "jwt-token",
+                        summary=(
+                            "The JWT HS256 secret is weak and was brute-forced. "
+                            "An attacker can forge arbitrary tokens."
+                        ),
+                        proof_of_concept=f"Secret found: `{secret}`",
+                        remediation=(
+                            "Replace the secret with a cryptographically random 256-bit key. "
+                            "Rotate all existing tokens immediately. "
+                            "Consider switching to RS256 (asymmetric) for better key management."
+                        ),
+                        references=[
+                            "https://portswigger.net/web-security/jwt",
+                            "https://owasp.org/Top10/A02_2021-Cryptographic_Failures/",
+                        ],
+                        cwe_id="CWE-321",
+                        cvss=CVSSVector(vector_string="AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"),
+                        response_diff_agreement=1.0,
                     )
-                    break
-            except Exception:
-                continue
+                )
+                break
 
     # ---- 3. kid (Key ID) injection hint ----
     if "kid" in header:

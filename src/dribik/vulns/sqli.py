@@ -31,7 +31,7 @@ _BUILTIN = [
     "1 AND 1=1", "1 AND 1=2",
 ]
 
-_ERROR_PATTERNS: dict[str, list[re.Pattern]] = {
+_ERROR_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     "MySQL":      [re.compile(r"you have an error in your sql syntax", re.IGNORECASE),
                    re.compile(r"warning: mysql", re.IGNORECASE)],
     "PostgreSQL": [re.compile(r"pg_query\(\)|pg_exec\(\)", re.IGNORECASE),
@@ -100,7 +100,7 @@ def _make_finding(param: str, url: str, payload: str, technique: str,
 
 
 def _probe(url: str, param: str, payload: str, injection_type: str, timeout: int,
-           seen: set, findings: list, asset_id: str) -> None:
+           seen: set[str], findings: list[Finding], asset_id: str) -> None:
     """Run one payload against one param and record a finding if triggered."""
     dedup_key = f"sqli:{injection_type}:{param}"
     if dedup_key in seen:
@@ -180,9 +180,3 @@ def scan_sqli(
 
     return findings
 
-
-def _inject_get(url: str, param: str, payload: str) -> str:
-    parsed = urllib.parse.urlsplit(url)
-    qp = dict(urllib.parse.parse_qsl(parsed.query))
-    qp[param] = payload
-    return urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(qp)))

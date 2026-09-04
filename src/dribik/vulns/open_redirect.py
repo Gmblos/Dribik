@@ -6,7 +6,7 @@ import urllib.parse
 import uuid
 from pathlib import Path
 
-from dribik.models import CVSSVector, Finding, Scope
+from dribik.models import CVSSVector, Finding, ScanResult, Scope
 from dribik.scanner import http_get, http_post
 from dribik.scope import classify
 
@@ -46,14 +46,16 @@ def _inject_get(url: str, param: str, payload: str) -> str:
     return urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(qp)))
 
 
-def _is_redirected(result) -> bool:
+def _is_redirected(result: ScanResult) -> bool:
     location = result.headers.get("location", "")
     if _EVIL_DOMAIN in location.lower():
         return True
     return any(_EVIL_DOMAIN in u.lower() for u in result.redirect_chain)
 
 
-def _make_finding(param: str, url: str, payload: str, result, asset_id: str, injection_type: str) -> Finding:
+def _make_finding(
+    param: str, url: str, payload: str, result: ScanResult, asset_id: str, injection_type: str
+) -> Finding:
     fid = f"REDIR-{uuid.uuid4().hex[:8].upper()}"
     return Finding(
         id=fid,

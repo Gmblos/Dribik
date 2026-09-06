@@ -97,6 +97,12 @@ dribik --request-header "X-Intigriti: <program-token>-<username>" scan headers .
 Use one `--request-header` flag per header. Dribik validates the name and value before sending the
 request.
 
+If you want Dribik to print the command shape for a specific workspace and target, use:
+
+```bash
+dribik config template ./my-engagement --url https://api.acme.com/ --scan headers --rate 5 --save
+```
+
 ---
 
 ## Quick start

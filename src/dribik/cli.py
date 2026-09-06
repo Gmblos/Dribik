@@ -73,6 +73,36 @@ def _parse_request_headers(values: tuple[str, ...]) -> dict[str, str]:
     return headers
 
 
+def _format_shell_arg(value: str) -> str:
+    if not value:
+        return '""'
+    if re.fullmatch(r"[A-Za-z0-9_./:=-]+", value):
+        return value
+    return '"' + value.replace('"', '\\"') + '"'
+
+
+def _build_command_template(
+    *,
+    workspace: Path,
+    scan: str,
+    url: str,
+    request_headers: tuple[str, ...],
+    rate: float,
+    save: bool,
+    import_graph: bool,
+) -> str:
+    parts = ["dribik", "--rate", f"{rate:g}"]
+    header_flags = request_headers or ('X-Intigriti: <program-token>-<username>',)
+    for header in header_flags:
+        parts.extend(["--request-header", header])
+    parts.extend(["scan", scan, str(workspace), "--url", url])
+    if save:
+        parts.append("--save")
+    if import_graph:
+        parts.append("--import-graph")
+    return " ".join(_format_shell_arg(part) for part in parts)
+
+
 # ---------------------------------------------------------------------------
 # Root group
 # ---------------------------------------------------------------------------
@@ -266,6 +296,53 @@ def request_replay(
     if result.error:
         raise click.ClickException(f"Replay failed: {result.error}")
     click.echo(f"[ok] {request.method} {url} -> HTTP {result.status} ({result.response_time_ms:.0f} ms)")
+
+
+# ---------------------------------------------------------------------------
+# config
+# ---------------------------------------------------------------------------
+@main.group()
+def config() -> None:
+    """Convenience helpers for repeatable command templates."""
+
+
+@config.command("template")
+@click.argument("workspace", type=click.Path(path_type=Path, exists=True, file_okay=False))
+@click.option(
+    "--scan",
+    type=click.Choice(["headers", "xss", "sqli", "ssrf", "lfi", "redirect", "crawl", "content", "tech"]),
+    default="headers",
+    show_default=True,
+    help="Which scan command to template.",
+)
+@click.option("--url", required=True, help="Target URL to place into the template")
+@click.option("--request-header", "request_headers", multiple=True, help="Static request header for the template")
+@click.option("--rate", type=float, default=10.0, show_default=True, help="Request rate to include in the template")
+@click.option("--save", is_flag=True, default=False, help="Include --save in the generated command")
+@click.option("--import-graph", is_flag=True, default=False, help="Include --import-graph in the generated command")
+def config_template(
+    workspace: Path,
+    scan: str,
+    url: str,
+    request_headers: tuple[str, ...],
+    rate: float,
+    save: bool,
+    import_graph: bool,
+) -> None:
+    """Print a copy-pasteable Dribik command for a specific bug bounty target."""
+    ws = Workspace(workspace)
+    program = ws.load_meta().program
+    command = _build_command_template(
+        workspace=workspace,
+        scan=scan,
+        url=url,
+        request_headers=request_headers,
+        rate=rate,
+        save=save,
+        import_graph=import_graph,
+    )
+    click.echo(f"Program: {program or 'unknown'}")
+    click.echo(command)
 
 
 # ---------------------------------------------------------------------------

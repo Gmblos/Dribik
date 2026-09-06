@@ -42,6 +42,31 @@ def test_cli_request_header_option_sets_global_headers(tmp_path: Path) -> None:
     set_headers.assert_called_once_with({"X-Intigriti": "token-123"})
 
 
+def test_cli_config_template_prints_copy_paste_command(tmp_path: Path) -> None:
+    runner = CliRunner()
+    ws = tmp_path / "template-ws"
+    runner.invoke(main, ["init", str(ws), "--program", "Storebrand"])
+    result = runner.invoke(
+        main,
+        [
+            "config",
+            "template",
+            str(ws),
+            "--scan",
+            "headers",
+            "--url",
+            "https://api.example.com/",
+            "--rate",
+            "5",
+            "--save",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Program: Storebrand" in result.output
+    assert 'dribik --rate 5 --request-header "X-Intigriti: <program-token>-<username>" scan headers' in result.output
+    assert "--save" in result.output
+
+
 def test_cli_doctor_reports_healthy_workspace(tmp_path: Path):
     runner = CliRunner()
     ws = tmp_path / "doctor"

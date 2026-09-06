@@ -28,7 +28,7 @@ jobs:
         run: |
           sudo gem install --no-document fpm
           version="$(python -c 'from dribik import __version__; print(__version__.replace("-beta", "~beta"))')"
-          fpm --source dir --target deb --name dribik --version "$version" --iteration 1 \
+          fpm -s dir -t deb --name dribik --version "$version" --iteration 1 \
             --architecture amd64 --license Apache-2.0 --url https://github.com/Gmblos/Dribik \
             --description "Authorized web pentesting workspace" \
             dist/dribik=/usr/bin/dribik

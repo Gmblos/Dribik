@@ -120,7 +120,7 @@ def _evaluate(result: ScanResult, asset_id: str) -> tuple[list[HeaderCheckResult
                 present=True,
                 value=acao,
                 severity="high",
-                note="CORS wildcard with credentials — browsers block but indicates misconfiguration.",
+                note="CORS wildcard with credentials - browsers block but indicates misconfiguration.",
             )
         )
         findings.append(

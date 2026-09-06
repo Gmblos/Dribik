@@ -1,0 +1,5 @@
+program: Dribik Local Practice Lab
+allow:
+  - kind: url_prefix
+    value: http://127.0.0.5:8080/
+deny: []

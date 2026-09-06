@@ -79,6 +79,12 @@ For the optional richer HTTP client and extras:
 pip install -e ".[full]"
 ```
 
+### Try it safely on your own computer
+
+The repository includes a deliberately insecure, loopback-only server at `127.0.0.5:8080` for
+testing Dribik without contacting a third-party system. See the
+[local practice lab instructions](examples/local_lab/README.md).
+
 ---
 
 ## Quick start

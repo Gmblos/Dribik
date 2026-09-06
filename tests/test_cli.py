@@ -1,9 +1,10 @@
 """Tests — CLI commands (migrated to dribik)."""
 from pathlib import Path
+from unittest import mock
 
 from click.testing import CliRunner
 
-from dribik.cli import main
+from dribik.cli import _parse_request_headers, main
 
 
 def _allow_example_scope(ws: Path) -> None:
@@ -21,6 +22,24 @@ def test_cli_init_and_status(tmp_path: Path):
     result = runner.invoke(main, ["graph", "status", str(ws)])
     assert result.exit_code == 0
     assert '"total": 0' in result.output
+
+
+def test_cli_request_header_parsing() -> None:
+    headers = _parse_request_headers(("X-Intigriti: token-123", "X-Trace: abc:def"))
+    assert headers == {"X-Intigriti": "token-123", "X-Trace": "abc:def"}
+
+
+def test_cli_request_header_option_sets_global_headers(tmp_path: Path) -> None:
+    runner = CliRunner()
+    ws = tmp_path / "header-ws"
+    runner.invoke(main, ["init", str(ws), "--program", "Demo"])
+    with mock.patch("dribik.scanner.set_request_headers") as set_headers:
+        result = runner.invoke(
+            main,
+            ["--request-header", "X-Intigriti: token-123", "graph", "status", str(ws)],
+        )
+    assert result.exit_code == 0, result.output
+    set_headers.assert_called_once_with({"X-Intigriti": "token-123"})
 
 
 def test_cli_doctor_reports_healthy_workspace(tmp_path: Path):

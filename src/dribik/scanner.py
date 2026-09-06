@@ -21,6 +21,7 @@ from dribik.scope import classify
 __all__ = [
     "set_rate_limit",
     "set_proxy",
+    "set_request_headers",
     "set_audit_callback",
     "http_request",
     "http_get",
@@ -61,6 +62,8 @@ class _RateLimiter:
 _limiter = _RateLimiter(10.0)
 # Global proxy URL — None means direct connection.
 _proxy_url: str | None = None
+# Global extra request headers — applied to all outbound requests made through this client.
+_request_headers: dict[str, str] = {}
 # Global audit callback — set by workspace when audit logging is enabled.
 _audit_callback: Callable[[AuditEntry], None] | None = None
 
@@ -75,6 +78,12 @@ def set_proxy(url: str | None) -> None:
     """Set global HTTP/HTTPS proxy URL, e.g. 'http://127.0.0.1:8080'."""
     global _proxy_url
     _proxy_url = url
+
+
+def set_request_headers(headers: dict[str, str] | None) -> None:
+    """Set extra headers to send with every outbound request through Dribik."""
+    global _request_headers
+    _request_headers = dict(headers or {})
 
 
 def set_audit_callback(cb: Callable[[AuditEntry], None] | None) -> None:
@@ -149,6 +158,8 @@ def http_get(
       from silently reaching an out-of-scope host.
     """
     request_headers = {"User-Agent": _DEFAULT_UA}
+    if _request_headers:
+        request_headers.update(_request_headers)
     if headers:
         request_headers.update(headers)
 
@@ -220,6 +231,8 @@ def http_post(
     """
     import json as _json
     request_headers = {"User-Agent": _DEFAULT_UA}
+    if _request_headers:
+        request_headers.update(_request_headers)
     if json_body:
         request_headers["Content-Type"] = "application/json"
         if isinstance(data, dict):
@@ -299,6 +312,8 @@ def http_request(
     if not normalized_method.isalpha():
         return ScanResult(url=url, error="HTTP method must contain letters only", method=normalized_method)
     request_headers = {"User-Agent": _DEFAULT_UA}
+    if _request_headers:
+        request_headers.update(_request_headers)
     if headers:
         request_headers.update(headers)
     request_body = (data or b"").decode("utf-8", errors="replace")

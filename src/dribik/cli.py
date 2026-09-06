@@ -36,6 +36,43 @@ def _validate_http_field_names(values: tuple[str, ...], label: str) -> list[str]
     return list(values)
 
 
+_DISALLOWED_REQUEST_HEADERS = {
+    "connection",
+    "content-length",
+    "host",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade",
+}
+
+
+def _parse_request_headers(values: tuple[str, ...]) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    for raw in values:
+        if ":" not in raw:
+            raise click.BadParameter("Request headers must use the form 'Name: value'")
+        name, value = raw.split(":", 1)
+        name = name.strip()
+        value = value.strip()
+        if not name or not value:
+            raise click.BadParameter("Request headers must include both a name and a value")
+        if not _HTTP_FIELD_NAME_RE.fullmatch(name):
+            raise click.BadParameter(f"Invalid request header name: {name}")
+        lowered = name.lower()
+        if lowered in _DISALLOWED_REQUEST_HEADERS:
+            raise click.BadParameter(f"Request header not allowed: {name}")
+        if lowered in headers:
+            raise click.BadParameter(f"Duplicate request header: {name}")
+        if "\r" in value or "\n" in value:
+            raise click.BadParameter(f"Invalid request header value: {name}")
+        headers[name] = value
+    return headers
+
+
 # ---------------------------------------------------------------------------
 # Root group
 # ---------------------------------------------------------------------------
@@ -45,16 +82,24 @@ def _validate_http_field_names(values: tuple[str, ...], label: str) -> list[str]
               help="Max requests per second (across all scan commands).", type=float)
 @click.option("--proxy", default=None,
               help="HTTP/HTTPS proxy URL, e.g. http://127.0.0.1:8080 (Burp/ZAP).", type=str)
+@click.option(
+    "--request-header",
+    "request_headers",
+    multiple=True,
+    help="Static HTTP header to add to every outbound request, e.g. 'X-Intigriti: token'.",
+)
 @click.pass_context
-def main(ctx: click.Context, rate: float, proxy: str | None) -> None:
+def main(ctx: click.Context, rate: float, proxy: str | None, request_headers: tuple[str, ...]) -> None:
     """Dribik - authorized web pentesting workspace (0.1.0-beta)."""
-    from dribik.scanner import set_proxy, set_rate_limit
+    from dribik.scanner import set_proxy, set_rate_limit, set_request_headers
     set_rate_limit(rate)
     if proxy:
         set_proxy(proxy)
+    set_request_headers(_parse_request_headers(request_headers))
     ctx.ensure_object(dict)
     ctx.obj["rate"] = rate
     ctx.obj["proxy"] = proxy
+    ctx.obj["request_headers"] = request_headers
 
 
 # ---------------------------------------------------------------------------

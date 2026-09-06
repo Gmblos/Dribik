@@ -85,6 +85,18 @@ The repository includes a deliberately insecure, loopback-only server at `127.0.
 testing Dribik without contacting a third-party system. See the
 [local practice lab instructions](examples/local_lab/README.md).
 
+### Researcher identity headers
+
+Some bug bounty programs require a static header on every request, such as an Intigriti identity
+header. Dribik supports that with `--request-header` at the top level:
+
+```bash
+dribik --request-header "X-Intigriti: <program-token>-<username>" scan headers ./my-engagement --url https://api.acme.com/
+```
+
+Use one `--request-header` flag per header. Dribik validates the name and value before sending the
+request.
+
 ---
 
 ## Quick start

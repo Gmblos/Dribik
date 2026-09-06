@@ -13,8 +13,12 @@ from dribik.scanner import (
     _RateLimiter,
     crawl,
     detect_tech_stack,
+    http_get,
+    http_post,
+    http_request,
     set_proxy,
     set_rate_limit,
+    set_request_headers,
 )
 
 
@@ -40,6 +44,22 @@ def test_set_proxy_and_build_opener() -> None:
     set_proxy(None)
     direct_opener = _build_opener(follow_redirects=False)
     assert direct_opener is not None
+
+
+def test_set_request_headers_apply_to_http_client() -> None:
+    set_request_headers({"X-Intigriti": "token-123"})
+    try:
+        with mock.patch("dribik.scanner._do_request", return_value=(200, {}, b"ok", "https://target.test/")) as do_request:
+            with mock.patch("dribik.scanner._limiter.wait"):
+                http_get("https://target.test/")
+                http_post("https://target.test/", data={"q": "1"})
+                http_request("PATCH", "https://target.test/", data=b"{}")
+        request_headers = [call.args[0].headers for call in do_request.call_args_list]
+    finally:
+        set_request_headers(None)
+
+    assert len(request_headers) == 3
+    assert all(headers.get("X-intigriti") == "token-123" for headers in request_headers)
 
 
 def test_link_parser_extracts_various_tags() -> None:

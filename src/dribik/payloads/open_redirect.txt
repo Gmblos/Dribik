@@ -7,7 +7,6 @@ https://evil.com
 /\evil.com
 https:evil.com
 %2F%2Fevil.com
-%2f%2fevil.com
 \/\/evil.com
 //%09/evil.com
 //evil.com/%2E%2E

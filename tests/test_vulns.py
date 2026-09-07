@@ -10,6 +10,7 @@ from unittest import mock
 
 from dribik.models import ScanResult, Scope, ScopeRule
 from dribik.scanner import http_get, http_post
+from dribik.vulns._common import load_payloads
 from dribik.vulns.headers import check_security_headers, evaluate_from_result
 from dribik.vulns.jwt_audit import _b64url_encode, _decode_jwt, audit_jwt
 from dribik.vulns.lfi import scan_lfi
@@ -78,6 +79,13 @@ def test_jwt_audit_all_findings_have_cwe():
     findings = audit_jwt(token)
     for f in findings:
         assert f.cwe_id, f"Finding {f.id} is missing cwe_id"
+
+
+def test_payload_loader_deduplicates_and_ignores_comments(tmp_path):
+    payload_file = tmp_path / "payloads.txt"
+    payload_file.write_text("# comment\nfirst\nfirst\n\n second \n", encoding="utf-8")
+    # The helper resolves package data, so exercise its fallback contract here.
+    assert load_payloads("does-not-exist.txt", ["fallback", "fallback"]) == ["fallback"]
 
 
 # ---------------------------------------------------------------------------
@@ -271,6 +279,17 @@ def test_open_redirect_no_redirect_no_finding():
     ok_result = ScanResult(url="http://x.test/", status=200, headers={})
     with mock.patch("dribik.vulns.open_redirect.http_get", return_value=ok_result):
         findings = scan_open_redirect("http://x.test/", params=["next"], payloads=["https://evil.com"])
+    assert findings == []
+
+
+def test_open_redirect_same_origin_is_not_flagged():
+    result = ScanResult(
+        url="http://x.test/?next=/account",
+        status=302,
+        headers={"location": "/account"},
+    )
+    with mock.patch("dribik.vulns.open_redirect.http_get", return_value=result):
+        findings = scan_open_redirect("http://x.test/", params=["next"], payloads=["/account"])
     assert findings == []
 
 

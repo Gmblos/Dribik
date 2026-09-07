@@ -5,19 +5,15 @@ from __future__ import annotations
 import re
 import urllib.parse
 import uuid
-from pathlib import Path
 
 from dribik.models import CVSSVector, Finding, ScanResult, Scope
 from dribik.scanner import http_get, http_post
 from dribik.scope import classify
+from dribik.vulns._common import load_payloads
 
 
 def _load_payloads() -> list[str]:
-    p = Path(__file__).parent.parent / "payloads" / "lfi.txt"
-    if p.exists():
-        return [ln.strip() for ln in p.read_text(encoding="utf-8").splitlines()
-                if ln.strip() and not ln.startswith("#")]
-    return _BUILTIN
+    return load_payloads("lfi.txt", _BUILTIN)
 
 
 _BUILTIN = [

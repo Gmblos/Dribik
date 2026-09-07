@@ -8,10 +8,10 @@ import hashlib
 import hmac
 import json
 import uuid
-from pathlib import Path
 from typing import Any
 
 from dribik.models import CVSSVector, Finding
+from dribik.vulns._common import load_payloads
 
 
 def _b64url_decode(s: str) -> bytes:
@@ -40,11 +40,7 @@ def _decode_jwt(token: str) -> tuple[dict[str, Any], dict[str, Any], str] | None
 
 
 def _load_wordlist() -> list[str]:
-    p = Path(__file__).parent.parent / "payloads" / "jwt_secrets.txt"
-    if p.exists():
-        return [ln.strip() for ln in p.read_text(encoding="utf-8").splitlines()
-                if ln.strip() and not ln.startswith("#")]
-    return _BUILTIN_SECRETS
+    return load_payloads("jwt_secrets.txt", _BUILTIN_SECRETS)
 
 
 _BUILTIN_SECRETS = [

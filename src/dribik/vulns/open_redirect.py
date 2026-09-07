@@ -4,19 +4,15 @@ from __future__ import annotations
 
 import urllib.parse
 import uuid
-from pathlib import Path
 
 from dribik.models import CVSSVector, Finding, ScanResult, Scope
 from dribik.scanner import http_get, http_post
 from dribik.scope import classify
+from dribik.vulns._common import load_payloads
 
 
 def _load_payloads() -> list[str]:
-    p = Path(__file__).parent.parent / "payloads" / "open_redirect.txt"
-    if p.exists():
-        return [ln.strip() for ln in p.read_text(encoding="utf-8").splitlines()
-                if ln.strip() and not ln.startswith("#")]
-    return _BUILTIN
+    return load_payloads("open_redirect.txt", _BUILTIN)
 
 
 _BUILTIN = [
@@ -28,8 +24,6 @@ _BUILTIN = [
     "https://evil.com%2F@target.com",
     "https://target.com@evil.com",
 ]
-
-_EVIL_DOMAIN = "evil.com"
 
 _REDIRECT_PARAMS = [
     "redirect", "redirect_url", "redirect_uri", "next", "target",
@@ -46,11 +40,19 @@ def _inject_get(url: str, param: str, payload: str) -> str:
     return urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(qp)))
 
 
-def _is_redirected(result: ScanResult) -> bool:
-    location = result.headers.get("location", "")
-    if _EVIL_DOMAIN in location.lower():
-        return True
-    return any(_EVIL_DOMAIN in u.lower() for u in result.redirect_chain)
+def _is_redirected(result: ScanResult, original_url: str) -> bool:
+    """Return true only when the redirect leaves the original origin."""
+    original = urllib.parse.urlsplit(original_url)
+    original_host = (original.hostname or "").lower()
+    candidates = [result.headers.get("location", ""), *result.redirect_chain]
+    for value in candidates:
+        if not value:
+            continue
+        destination = urllib.parse.urlsplit(urllib.parse.urljoin(original_url, value))
+        destination_host = (destination.hostname or "").lower()
+        if destination_host and destination_host != original_host:
+            return True
+    return False
 
 
 def _make_finding(
@@ -119,7 +121,7 @@ def scan_open_redirect(
                 injected = _inject_get(url, param, payload)
                 # Keep the 3xx response so Location can be evaluated directly.
                 result = http_get(injected, timeout=timeout, follow_redirects=False)
-                if not result.error and (result.status in (301, 302, 303, 307, 308) and _is_redirected(result)):
+                if not result.error and (result.status in (301, 302, 303, 307, 308) and _is_redirected(result, url)):
                     seen.add(dedup_get)
                     findings.append(_make_finding(param, injected, payload, result, asset_id, "GET query"))
                     continue
@@ -129,7 +131,7 @@ def scan_open_redirect(
                 dedup_post = f"redirect:post:{param}"
                 if dedup_post not in seen:
                     result = http_post(url, data={param: payload}, timeout=timeout)
-                    if not result.error and (result.status in (301, 302, 303, 307, 308) and _is_redirected(result)):
+                    if not result.error and (result.status in (301, 302, 303, 307, 308) and _is_redirected(result, url)):
                         seen.add(dedup_post)
                         findings.append(_make_finding(param, url, payload, result, asset_id, "POST body"))
 

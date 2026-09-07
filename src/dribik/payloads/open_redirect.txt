@@ -17,3 +17,12 @@ https://target.com@evil.com
 https://evil.com%2F@target.com
 javascript:alert(document.location='https://evil.com')
 data:text/html,<script>window.location='https://evil.com'</script>
+https%3A%2F%2Fevil.com
+%2F%2Fevil.com%2F
+%5C%5Cevil.com
+/%2Fevil.com
+https://evil.com%23@target.example
+https://target.example%2Fevil.com@evil.com
+//evil.com:443
+http://evil.com/%2e%2e
+https://evil.com%09.target.example

